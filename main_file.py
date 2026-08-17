@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import pandas as pd
 from charm.toolbox.pairinggroup import ZR, GT
 from charm.toolbox.pairinggroup import PairingGroup
@@ -49,7 +51,7 @@ def main():
     # we register a user
     user = {}
     user_gid = 'gid'
-    user = puncture_maabe_obj.regUser(user_gid, attrs)
+    user = puncture_maabe_obj.regUser(gid=user_gid, attributes=attrs, anonymity_level= 10)
 
     #
     access_policy = f"(({attrs['attribute4']} or {attrs['attribute3']}) and ({attrs['attribute3']} or {attrs['attribute1']}))" #f"(({four_hidden} or {three_hidden}) and ({three_hidden} or {one_hidden}))"
@@ -186,7 +188,7 @@ def main():
     #
     TC, I = puncture_maabe_obj.transform(CT=CT, DU_hkey=DU_hkey, gid=puncture_maabe_obj.users[user_gid].get('gid'))
 
-    rec_msg = puncture_maabe_obj.Decrypt(CT, TC, I, do_key, pub_DO)
+    rec_msg = puncture_maabe_obj.Decrypt(CT, TC, I, do_key, pub_DO, puncture_maabe_obj.user_secret_product)
 
     # if debug: print("\n\nCiphertext...\n")
     # groupObj.debug(ct)
@@ -198,7 +200,17 @@ def main():
         print(f" msg recovered: {rec_msg} \n")
     print("Successful Decryption!!!")
 
+    myset = defaultdict(dict)
+    myset['a']=(('a',puncture_maabe_obj.crs['group'].serialize(puncture_maabe_obj.crs['group'].hash('a',ZR), compression=False).hex().upper()))
+
+    myset_list = list()
+    myset_list.append(myset)
+
+    print(f"myset: {myset['a']}")
+
 
 if __name__ == "__main__":
     debug = False
+    #
+    single_puncture = False
     main()
