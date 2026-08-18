@@ -158,8 +158,8 @@ def main():
     if puncturing is True:
         # we can verify accumulator attestation signature
         acc_val = CT['ACC'].acc_get_value()
-        left_pair = pair(puncture_maabe_obj.crs['g1'], CT['sig_ACC'])
-        right_pair = pair(puncture_maabe_obj.crs['g1'] ** puncture_maabe_obj.crs['group'].hash(str(acc_val), ZR), puncture_maabe_obj.public_attestation_key)
+        left_pair = pair(puncture_maabe_obj.crs['g'], CT['sig_ACC'])
+        right_pair = pair(puncture_maabe_obj.crs['g'] ** puncture_maabe_obj.crs['group'].hash(str(acc_val), ZR), puncture_maabe_obj.public_attestation_key)
         assert left_pair == right_pair, "Accumulator attestation signature verification failed!"
         print("Accumulator attestation signature verified successfully.")
 
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     debug = False
     # ******************PUNCTURING PHASE******************
     # whether to puncture or not
-    puncturing = False
+    puncturing = True
     # whether to perform batch or single puncture
     single_puncture = True
     #
