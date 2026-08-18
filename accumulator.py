@@ -24,7 +24,7 @@ class accumulator:
         Initialize the accumulator with the identity element of G1.
         ACC = 1_{G1} = g^0
         """
-        self.ACC_value = self.crs['g2'] ** (self.crs['group'].init(ZR, 0))
+        self.ACC_value = self.crs['g'] ** (self.crs['group'].init(ZR, 0))
         self.tag_dict = {}
         self.acc_len = 0
         return self.ACC_value
@@ -37,7 +37,7 @@ class accumulator:
         tag \in {0,1}*
         Returns: g^{H(tag)} \in G1
         """
-        tag_group = self.crs['g2'] ** (self.crs['group'].hash(str(tag_name), ZR))
+        tag_group = self.crs['g'] ** (self.crs['group'].hash(str(tag_name), ZR))
         return tag_group
 
     # -----------------------------------------------------------------------------------------------------------
