@@ -41,7 +41,7 @@ from accumulator import accumulator
 debug = True
 
 # type annotations
-crs_t = {'g1': G1, 'g2': G2, 'e_gg': GT}
+crs_t = {'g': G1, 'g': G2, 'e_gg': GT}
 
 # type annotations
 pp_t = {'h': G1, 'f': G1, 'e_gg_alpha': GT}
@@ -61,15 +61,14 @@ class P_MACP_ABE(ABEnc):
         util = SecretUtil(group_obj, verbose=True)
         group = group_obj
 
-        g1 = group.random(G1)
-        g2 = group.random(G2)
+        g = group.random(G1)
         #
-        g1.initPP()
-        g2.initPP()
-        #
-        e_gg = pair(g1, g2)
+        g.initPP()
 
-        self.crs = {'g1': g1, 'g2': g2, 'e_gg': e_gg, 'group': group, 'util': util}
+        #
+        e_gg = pair(g, g)
+
+        self.crs = {'g': g, 'e_gg': e_gg, 'group': group, 'util': util}
 
         # the accumulator data structure
         self.accumulator = None
@@ -99,7 +98,7 @@ class P_MACP_ABE(ABEnc):
         self.secret_attestation_key = self.crs['group'].random(ZR)
         #
         # the public attestation key from the transparent TEE
-        self.public_attestation_key = self.crs['g2'] ** self.secret_attestation_key
+        self.public_attestation_key = self.crs['g'] ** self.secret_attestation_key
     # --------------------------------------------------------------------------------------------------------
 
     def regUser(self, gid: str, attributes: list, anonymity_level: int):
@@ -107,7 +106,7 @@ class P_MACP_ABE(ABEnc):
         a2 = self.crs['group'].random(ZR)
         b2 = self.crs['group'].random(ZR)
         prv_DU = a2 * b2
-        pub_DU = self.crs['g2'] ** prv_DU
+        pub_DU = self.crs['g'] ** prv_DU
         DU_key = {}
         DU_hkey = []
 
@@ -128,7 +127,7 @@ class P_MACP_ABE(ABEnc):
             a1 = self.crs['group'].random(ZR)
             b1 = self.crs['group'].random(ZR)
             prv_AA = a1 * b1
-            pub_AA = self.crs['g2'] ** prv_AA
+            pub_AA = self.crs['g'] ** prv_AA
 
             self.authorities[authorityid] = {
                 'name': authority_name, 'pub_AA': pub_AA, 'prv_AA': prv_AA,
@@ -141,13 +140,13 @@ class P_MACP_ABE(ABEnc):
         a0 = self.crs['group'].random(ZR)
         b0 = self.crs['group'].random(ZR)
         prv_DO = a0 * b0
-        pub_DO = self.crs['g2'] ** prv_DO
+        pub_DO = self.crs['g'] ** prv_DO
 
         beta = self.crs['group'].random(ZR)
-        h = self.crs['g1'] ** beta
+        h = self.crs['g'] ** beta
 
         alpha = self.crs['group'].random(ZR)
-        g_alpha = self.crs['g2'] ** alpha
+        g_alpha = self.crs['g'] ** alpha
         e_gg_alpha = self.crs['e_gg'] ** alpha
 
         pp = {'h': h, 'e_gg_alpha': e_gg_alpha}
@@ -164,15 +163,15 @@ class P_MACP_ABE(ABEnc):
         self.random_user_exponent = r
 
         sk_DO = (msk['g_alpha'] ** (1 / msk['beta'])) * (self.users[gid]['pub_DU'] ** (1 / (msk['beta']))) * (
-            self.crs['g2'] ** (r * (1 / (msk['beta']))))
+            self.crs['g'] ** (r * (1 / (msk['beta']))))
 
-        hk_DO_1 = (self.crs['g2'] ** gamma) * (self.crs['g2'] ** r) * (self.users[gid]['pub_DU'])
-        hk_DO_2 = self.crs['g2'] ** (self.crs['group'].hash(str(epsilon), ZR) * gamma * (1 / msk['beta']))
-        hk_DO_3 = self.crs['g2'] ** (gamma * (1 / msk['beta']))
+        hk_DO_1 = (self.crs['g'] ** gamma) * (self.crs['g'] ** r) * (self.users[gid]['pub_DU'])
+        hk_DO_2 = self.crs['g'] ** (self.crs['group'].hash(str(epsilon), ZR) * gamma * (1 / msk['beta']))
+        hk_DO_3 = self.crs['g'] ** (gamma * (1 / msk['beta']))
 
         T = set()
         desc_T = defaultdict(dict)
-        sigma_T = self.crs['g2'] ** (self.crs['group'].hash(str(T.__str__()), ZR) * prv_DO)
+        sigma_T = self.crs['g'] ** (self.crs['group'].hash(str(T.__str__()), ZR) * prv_DO)
 
         DO_key = {'sk': sk_DO, 'hk_1': hk_DO_1, 'hk_2': hk_DO_2, 'hk_3': hk_DO_3, 'T': T, 'sigma_T': sigma_T,
                   'desc_T': desc_T}
@@ -183,7 +182,7 @@ class P_MACP_ABE(ABEnc):
         S_DU_hidden = {}
         gamma = self.crs['group'].hash(str(gid), ZR)
         for att_name in S_DU.keys():
-            hidden_att_value = (self.crs['g2'] ** (
+            hidden_att_value = (self.crs['g'] ** (
                 self.crs['group'].hash(S_DU.get(att_name).split("$", 1)[1], ZR) * gamma)) * DO_key[
                 'hk_2']
             S_DU_hidden[att_name] = (att_name, hidden_att_value)
@@ -191,8 +190,8 @@ class P_MACP_ABE(ABEnc):
 
 
     def hide_by_DO(self, msk, attribute_value: str, epsilon: str):
-        return (self.crs['g1'] ** (self.crs['group'].hash(str(attribute_value), ZR))) * (
-            self.crs['g1'] ** ((self.crs['group'].hash(str(epsilon), ZR)) * (1 / (msk['beta']))))
+        return (self.crs['g'] ** (self.crs['group'].hash(str(attribute_value), ZR))) * (
+            self.crs['g'] ** ((self.crs['group'].hash(str(epsilon), ZR)) * (1 / (msk['beta']))))
 
     def keygen2(self, AA_ID, gid, S_DU: dict):
         gamma_du = self.crs['group'].hash(str(gid), ZR)
@@ -213,7 +212,7 @@ class P_MACP_ABE(ABEnc):
             attr_value = S_DU.get(att_name)[1]
             r_j = self.crs['group'].random(ZR)
             D_j = (attr_value ** (r_j / (prv_AA + gamma_du)))
-            T_j = self.crs['g2'] ** (gamma_du * r_j / (prv_AA + gamma_du))
+            T_j = self.crs['g'] ** (gamma_du * r_j / (prv_AA + gamma_du))
             AA_key[(att_name, attr_value)] = {'D_j': D_j, 'T_j': T_j, 'attr': att_name}
         return AA_key
 
@@ -247,7 +246,7 @@ class P_MACP_ABE(ABEnc):
         T_prime = set()
 
         r_real_tag = self.crs['group'].random(ZR)
-        real_tag_component = self.crs['g2'] ** (
+        real_tag_component = self.crs['g'] ** (
                     r_real_tag * self.crs['group'].hash(str(tag_name), ZR) * self.crs['group'].hash(str(gid), ZR))
 
         T_prime.add(tag_name)
@@ -266,7 +265,7 @@ class P_MACP_ABE(ABEnc):
         for dummy_tag in dummy_tag_generated_list:
             dummy_tag_name = f'{dummy_tag}'
             r_dummy_tag = self.crs['group'].random(ZR)
-            dummy_tag_component = self.crs['g2'] ** (
+            dummy_tag_component = self.crs['g'] ** (
                         self.crs['group'].hash(str(dummy_tag_name), ZR) * r_dummy_tag * self.crs['group'].hash(
                     str(gid), ZR) / sum_dummy_tag_list_elements)
 
@@ -281,7 +280,7 @@ class P_MACP_ABE(ABEnc):
             att_value = item[1]
             index = att_value ** (1 / self.crs['group'].hash(str(gid), ZR))
             index_value_hex = self.crs['group'].serialize(index, compression=False).hex().upper()
-            update_term_Dj = self.crs['g2'] ** (self.crs['group'].init(ZR, 0))
+            update_term_Dj = self.crs['g'] ** (self.crs['group'].init(ZR, 0))
             for dummy_tag in dummy_tag_dict.keys():
                 r_dummy = dummy_tag_dict[dummy_tag]
                 update_term_Dj = update_term_Dj * (att_value ** ((
@@ -305,7 +304,7 @@ class P_MACP_ABE(ABEnc):
 
         for real_tag_name in tag_name_list:
             real_tag_element = self.crs['group'].random(ZR)
-            real_tag_component = self.crs['g2'] ** (
+            real_tag_component = self.crs['g'] ** (
                         self.crs['group'].hash(str(real_tag_name), ZR) * real_tag_element * self.crs['group'].hash(
                     str(gid), ZR))
             T_prime.add(real_tag_name)
@@ -321,7 +320,7 @@ class P_MACP_ABE(ABEnc):
         for dummy_tag in dummy_tag_generated_list:
             dummy_tag_name = f'{dummy_tag}'
             r_dummy_tag = self.crs['group'].random(ZR)
-            dummy_tag_component = self.crs['g2'] ** (
+            dummy_tag_component = self.crs['g'] ** (
                         self.crs['group'].hash(str(dummy_tag_name), ZR) * r_dummy_tag * self.crs['group'].hash(
                     str(gid), ZR) / sum_dummy_tag_list_elements)
 
@@ -336,7 +335,7 @@ class P_MACP_ABE(ABEnc):
             att_value = item[1]
             index = att_value ** (1 / self.crs['group'].hash(str(gid), ZR))
             index_value_hex = self.crs['group'].serialize(index, compression=False).hex().upper()
-            update_term_Dj = self.crs['g2'] ** (self.crs['group'].init(ZR, 0))
+            update_term_Dj = self.crs['g'] ** (self.crs['group'].init(ZR, 0))
             for dummy_tag in dummy_tag_dict.keys():
                 r_dummy = dummy_tag_dict[dummy_tag]
                 update_term_Dj = update_term_Dj * (att_value ** ((
@@ -355,7 +354,7 @@ class P_MACP_ABE(ABEnc):
 
     # ask for attestation secret key
     def csp_puncture(self, CT, DU_hkey, T_prime: set, desc_T_prime: defaultdict(dict), gid: str):
-        update_term_Tj = self.crs['g2'] ** (self.crs['group'].init(ZR, 0))
+        update_term_Tj = self.crs['g'] ** (self.crs['group'].init(ZR, 0))
         for tag in desc_T_prime.keys():
             tag_component = desc_T_prime[tag]
             update_term_Tj = update_term_Tj * tag_component
@@ -377,7 +376,7 @@ class P_MACP_ABE(ABEnc):
         CT['ACC'].accumulate_tags(legit_tags)
 
         acc_value = CT['ACC'].acc_get_value()
-        sig_ACC = self.crs['g2'] ** (self.crs['group'].hash(str(acc_value), ZR) * self.secret_attestation_key)
+        sig_ACC = self.crs['g'] ** (self.crs['group'].hash(str(acc_value), ZR) * self.secret_attestation_key)
 
         return DU_hkey, sig_ACC
 
@@ -394,8 +393,8 @@ class P_MACP_ABE(ABEnc):
         C = pp['h'] ** s
         C_y, T_y, C_attr = {}, {}, {}
 
-        W = self.crs['g2'] ** (self.crs['group'].hash(str(M), ZR))
-        sig_W = self.crs['g2'] ** (self.crs['group'].hash(str(W), ZR) * prv_DO)
+        W = self.crs['g'] ** (self.crs['group'].hash(str(M), ZR))
+        sig_W = self.crs['g'] ** (self.crs['group'].hash(str(W), ZR) * prv_DO)
 
         for i in shares.keys():
             j = self.crs['util'].strip_index(i)
@@ -407,7 +406,7 @@ class P_MACP_ABE(ABEnc):
             # print(f" bytes representation for the upper case is {bytes.fromhex(attribute_value.upper())} \n\n")
             attr_byte_value = bytes.fromhex(attribute_value)
             element_attribute_value = self.crs['group'].deserialize(attr_byte_value, compression=False)
-            C_y[i] = self.crs['g1'] ** shares[i]
+            C_y[i] = self.crs['g'] ** shares[i]
             T_y[i] = element_attribute_value ** shares[i]
             C_attr[j] = i
 
@@ -461,9 +460,9 @@ class P_MACP_ABE(ABEnc):
 
         print(f" the computed value of TC is: {TC} \n")
 
-        TC = (pair(self.crs['g1'], self.crs['g2']) ** (
+        TC = (pair(self.crs['g'], self.crs['g']) ** (
             (self.random_user_exponent + self.crs['group'].hash(str(gid), ZR)) * self.shared_secret)) * (
-                     (pair(self.crs['g1'], self.crs['g2'])) ** (self.users[gid]['prv_DU'] * self.shared_secret))
+                     (pair(self.crs['g'], self.crs['g'])) ** (self.users[gid]['prv_DU'] * self.shared_secret))
 
         self.TC = TC
         print(f" the value of self.TC is: {self.TC} \n")
@@ -479,9 +478,9 @@ class P_MACP_ABE(ABEnc):
         B = ((F * I) / TC)
         M_prime = CT['C_tilde'] / B
 
-        W_prime = self.crs['g2'] ** (self.crs['group'].hash(str(M_prime), ZR))
+        W_prime = self.crs['g'] ** (self.crs['group'].hash(str(M_prime), ZR))
 
-        if pair(self.crs['g1'], CT['sig_W']) == pair(self.crs['g1'] ** self.crs['group'].hash(str(W_prime), ZR),
+        if pair(self.crs['g'], CT['sig_W']) == pair(self.crs['g'] ** self.crs['group'].hash(str(W_prime), ZR),
                                                      pub_DO):
             return M_prime
         else:
