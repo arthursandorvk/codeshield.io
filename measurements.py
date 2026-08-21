@@ -106,7 +106,7 @@ p_macp_abe_cph_data = {
 curve_type = "SS512"
 
 
-def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1, k2, k3, msg, privacy_level, epsilon_str, N=2):
+def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1, k2, k3, msg, privacy_level, epsilon_str, N=10):
     # for P_MACP_ABE
     # calling the garbage collector
     gc.collect(0)
@@ -172,7 +172,7 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
         gc.collect()
 
         if abe.name == "P-MACP-ABE":
-            list_length = int(len(attr_list) / 3)
+            list_length = int(len(attr_list) // 3)
             attr_list_1 = attr_list[0:list_length]
             attr_list_2 = attr_list[list_length:(2 * list_length)]
             attr_list_3 = attr_list[(2 * list_length):len(attr_list)]
@@ -184,7 +184,7 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             gc.collect(2)
             gc.collect()
             start_setup = time.perf_counter()
-            (prv_DO, pub_DO, pk, msk) = abe.setup()
+            (prv_DO, pub_DO, pk, msk) = abe.setup_()
             end_setup = time.perf_counter()
             time_setup = end_setup - start_setup
             sum_setup_pmacpabe += time_setup
@@ -192,10 +192,13 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
 
             # Register a single user
             # such user stands as the target user
-            start_setup_1 =time.perf_counter()
-            alice = abe.regUser('alice', attr_list, privacy_level)
-            end_setup_1 =time.perf_counter()
-            time_setup_1 = end_setup_1 - start_setup_1
+            start_reg =time.perf_counter()
+            # alice = abe.regUser('alice', attr_list, privacy_level)
+            # FIX: regUser needs dict, not list
+            alice = abe.regUser('alice', puncturable_attr_dict, privacy_level)
+
+            end_reg =time.perf_counter()
+            time_setup_1 = end_reg - start_reg
             # sum_setup_srmacpabe += time_setup_1
             sum_reg_user_pmacpabe += time_setup_1
 
@@ -225,7 +228,6 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             # DO Keygen1
             start_keygen_1 = time.perf_counter()
             alice['DO_key'] = abe.keygen1(msk, alice['gid'], prv_DO, epsilon_str)
-            print("HELOOOOOOOOOOOOOOOOOOO IN KEYGEN 1 \n")
             end_keygen_1 =time.perf_counter()
             time_keygen = end_keygen_1 - start_keygen_1
             sum_keygen_pmacpabe += time_keygen
@@ -238,7 +240,7 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             #
             # we need to create subdirectories relative to the use of attributes list per AA
             items = list(puncturable_attr_dict.items())
-            list_length = len(items) / 3
+            list_length = len(items) // 3
             attr_dict_1 = dict(items[0:list_length])
             attr_dict_2 = dict(items[list_length:(2 * list_length)])
             attr_dict_3 = dict(items[(2 * list_length):])
@@ -271,7 +273,7 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             # TEE-CS Keygen3
             start_keygen_3 =time.perf_counter()
             #
-            alice['TK_DU'] = abe.keygen3((aa_key_1, aa_key_2, aa_key_3))
+            alice['TK_DU'] = abe.keygen3([aa_key_1, aa_key_2, aa_key_3], alice['gid'])
             #
             end_keygen_3 =time.perf_counter()
             time_keygen = end_keygen_3 - start_keygen_3
@@ -290,17 +292,14 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             #-----------------------------------------------------------------------------------
             # we can only form the hidden policy from inside this code section
             # -----------------------------------------------------------------------------------
-            hidden_attr_1 = abe.hide_by_DO(msk, attribute_value=attr[0], epsilon=epsilon_str)
+            hidden_attr_1 = abe.hide_by_DO(msk, attribute_value=attr_list[0], epsilon=epsilon_str)
             counter = 1
             #
             hidden_policy_str = f'({hidden_attr_1}'
-            my_attr_list =[]
-            my_attr_list.append(f'{counter}${hidden_attr_1}')
            #
             for att in attr_list[1:]:
-                hidden_attr = abe.hide_by_DO(msk, attribute_value=attr, epsilon=epsilon_str)
+                hidden_attr = abe.hide_by_DO(msk, attribute_value=att, epsilon=epsilon_str)
                 counter += 1
-                my_attr_list.append(f'{counter}${hidden_attr}')
                 hidden_policy_str += f' and {hidden_attr}'
             hidden_policy_str += ')'
 
@@ -328,7 +327,9 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
                 abe.crs['group'].serialize(ctxt['ACC'].acc_len, compression=False))
             #
             for value in ctxt['C_y'].values():
-                size_cph += len(abe.crs['group'].serialize(value, compression=False))
+                # size_cph += len(abe.crs['group'].serialize(value, compression=False))
+                # C_y values are ints
+                size_cph += len(str(value).encode('utf-8'))
             #
             for value in ctxt['T_y'].values():
                 size_cph += len(abe.crs['group'].serialize(value, compression=False))
@@ -343,6 +344,11 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             # for value in ctxt['ACC'].tag_list:
             #     size_cph += len(str.encode(value, encoding='utf-8'))
             #
+
+            # before puncturing we need to safegard the values of DU_jkey and DU_hkey as our implementation applies both sequentially
+            # but this can also be tolerated by our seamless design
+            DU_key_bak = alice['DU_key']
+            DU_hkey_bak = alice['DU_hkey']
 
             # ---------------------------------------------------------------------------------------------------
             # **************************user single puncturing ******************************
@@ -383,6 +389,11 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             # **************************user batch puncturing ******************************
             # ---------------------------------------------------------------------------------------------------
             start_DU_puncture = time.perf_counter()
+            #
+            # use the original  secret and helper keys
+            alice['DU_key'] = DU_key_bak
+            alice['DU_hkey'] = DU_hkey_bak
+
             # k-anonymity should be greater than the number of attributes
             tag_to_puncture_list = [str(uuid.uuid4()) for _ in range(len(attr_list))] # uuid.uuid4() # we generate a legit tag
             #
@@ -425,7 +436,7 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
 
             # Final decryption stage by Data User
             start_decrypt =time.perf_counter()
-            M2 = abe.decrypt(ctxt, TC, I, alice['DU_hkey'], pub_DO)
+            M2 = abe.decrypt(ctxt, TC, I, alice['DU_key'], pub_DO)
             end_decrypt =time.perf_counter()
             time_decrypt = end_decrypt - start_decrypt
             sum_decrypt_pmacpabe += time_decrypt
@@ -705,8 +716,8 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
     # compute average time
     time_setup_kyxj = sum_setup_kyxj / N
     time_setup_pmacpabe = sum_setup_pmacpabe / N
-    print(f" current summation time for setup {sum_setup_pmacpabe} \n")
-    print(f" current time for setup for P-MACPABE is {time_setup_pmacpabe} and for KYXJ is {time_setup_kyxj} for number of rounds {N} \n\n")
+    # print(f" current summation time for setup {sum_setup_pmacpabe} \n")
+    # print(f" current time for setup for P-MACPABE is {time_setup_pmacpabe} and for KYXJ is {time_setup_kyxj} for number of rounds {N} \n\n")
     time_setup_rw = sum_setup_rw / N
 
     time_hide_pmacpabe = sum_hide_attr / N
@@ -769,11 +780,20 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
 
 
 def print_running_time(scheme_name, times, attr_number, privacy_level):
-    print(f" the time variable is {scheme_name}: {times}: {attr_number}: {privacy_level} \n\n")
-    print('{:<26}'.format(scheme_name) + str(attr_number).format(' ') + 15*' ' + str(privacy_level).format('   ') + 11*' '+
-          format(times[0] * 1000,'7.2f') + 8*' ' + format(times[1] * 1000,'7.2f') + 8*' ' +
-          format(times[2] * 1000, '7.2f') + 8*' ' + format(times[3] * 1000, '7.2f') +11*' ' +
-          format(times[4] * 1000, '7.2f') +11*' ' + format(times[5] * 1000, '7.2f'))
+    # print(f" the time variable is {scheme_name}: {times}: {attr_number}: {privacy_level} \n\n")
+    if scheme_name == "P-MACP-ABE":
+        print('{:<26}'.format(scheme_name) + str(attr_number).format('  ') + 15*' ' + str(privacy_level).format('   ') + 11*' '+
+            format(times[6] * 1000, '7.2f') + 8 * ' ' + format(times[7] * 1000, '7.2f') + 8 * ' ' +
+            format(times[8] * 1000, '7.2f') + 8 * ' ' + format(times[10] * 1000, '7.2f') + 11 * ' ' +
+            format(times[31] * 1000, '7.2f') + 11 * ' ' + format(times[11] * 1000, '7.2f')
+
+            )
+    else:
+        print('{:<26}'.format(scheme_name) + str(attr_number).format(' ') + '         ' + format(times[0] * 1000,
+                                                                                                 '7.2f') + '        ' + format(
+            times[1] * 1000,
+            '7.2f') + '       ' + format(
+            times[2] * 1000, '7.2f') + '       ' + format(times[3] * 1000, '7.2f'))
 
 # def measure_average_times(abe, attr_list, policy_str, revoked_user_list, k1, k2, k3, msg, privacy_level, epsilon_str, hidden_policy_str, N=10):
 def run_all(pairing_group, policy_size, policy_str, attr_list, puncturable_attr_dict, rw_policy_string, rw_attr_list, k1, k2, k3, msg, privacy_level, epsilon_str):
@@ -800,10 +820,13 @@ def run_all(pairing_group, policy_size, policy_str, attr_list, puncturable_attr_
     #         time_keygen_rw, time_enc_rw, time_dec_rw, time_reg_user_rw, time_AA_setup_rw, avg_size_cph_kyxj,
     #         avg_size_cph_pcmacpabe, avg_size_cph_rw, avg_accumulator_single_puncture, avg_accumulator_batch_puncture]
 
-    print(" voici les details sur le running_time \n\n \n")
-
     print_running_time(p_macp_abe24.name, p_macp_abe_times, len(attr_list), privacy_level)
     #
+    print(f""
+          f"1- setup: {p_macp_abe_times[6]}\n"
+          f"2- keygen: {p_macp_abe_times[7]}\n"
+          f"3- encryption: {p_macp_abe_times[8]}\n")
+
     print('{:<26}'.format('   | setup') + str(len(attr_list)).format(' ') + '{:<15}'.format(' ') +
           str(privacy_level).format(' ') + 11*' ' + format(p_macp_abe_times[6] * 1000, '7.2f') + 12*' ' + '-' + 14*' '
           + '-' + format(' ') + 3*' ' + format('  ') + 8*' ' + '-' + format(' ') + 16*' ' + '-' +
@@ -1029,7 +1052,9 @@ def create_policy_string_and_attribute_list(n, pairing_group):
     rw_attr_list = ['1@AA1']
 
     # we deal with the lis of attributes for the puncturable scheme
-    puncturable_attr_dict = {'1': {'1': '1$1'}}
+    puncturable_attr_dict = {}
+    # {'1': {'1': '1$1'}}
+    puncturable_attr_dict['1'] = f'1$1'
 
     AA_list = ['AA1', 'AA2', 'AA3']
 
@@ -1044,7 +1069,8 @@ def create_policy_string_and_attribute_list(n, pairing_group):
         rw_attr_list.append(attr1)
         rw_policy_string += ' and ' + attr1
         #
-        puncturable_attr_dict[f'{str(i)}']={f'{str(i)}':f'{attr2}'}
+        # puncturable_attr_dict[f'{str(i)}']={f'{str(i)}':f'{attr2}'}
+        puncturable_attr_dict[f"{str(i)}"] = f"{attr2}"
 
     policy_string += ')'
     # hidden_policy_string += ')'
@@ -1085,20 +1111,20 @@ def main():
     # policy_str, attr_list, hidden_policy = create_policy_string_and_attribute_list(policy_size, pairing_group)
     # run_all(pairing_group, policy_size, policy_str, attr_list, hidden_policy, msg)
 
-    #for policy_size in policy_sizes:
+    for policy_size in policy_sizes:
     # we do pair the first policy size with the first privacy level, the second with the second, etc.,
     # we assume that the number of real tags in batch puncturing is the same as the policy size
-    for policy_size, privacy_level in zip(policy_sizes, privacy_levels):
+    # for policy_size, privacy_level in zip(policy_sizes, privacy_levels):
         gc.collect(0)
         gc.collect(1)
         gc.collect(2)
         policy_str, attr_list, rw_policy_string, rw_attr_list, puncturable_attr_dict = create_policy_string_and_attribute_list(policy_size, pairing_group)
+        privacy_level = 2* policy_size
         #
         print(f" the list of attributes for puncture is {puncturable_attr_dict}")
         print(f" the list of attributes for other schemes is {attr_list}")
         print(f" the policy for other schemes is {policy_str}")
-        run_all(pairing_group, policy_size, policy_str, attr_list, puncturable_attr_dict, rw_policy_string, rw_attr_list, k1, k2, k3, msg, privacy_level,
-                              epsilon_str)
+        run_all(pairing_group, policy_size, policy_str, attr_list, puncturable_attr_dict, rw_policy_string, rw_attr_list, k1, k2, k3, msg, privacy_level, epsilon_str)
         gc.collect(0)
         gc.collect(1)
         gc.collect(2)
