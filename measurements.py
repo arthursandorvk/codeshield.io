@@ -13,6 +13,7 @@
 import cProfile
 import gc
 import hashlib
+import os
 import pstats
 import random
 import threading
@@ -106,7 +107,7 @@ p_macp_abe_cph_data = {
 curve_type = "SS512"
 
 
-def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1, k2, k3, msg, privacy_level, epsilon_str, N=10):
+def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1, k2, k3, msg, privacy_level, epsilon_str, N=2):
     # for P_MACP_ABE
     # calling the garbage collector
     gc.collect(0)
@@ -184,13 +185,11 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             gc.collect(2)
             gc.collect()
             #
-            print("[1/14] Setup...")
             start_setup = time.perf_counter()
             (prv_DO, pub_DO, pk, msk) = abe.setup_()
             end_setup = time.perf_counter()
             time_setup = end_setup - start_setup
             sum_setup_pmacpabe += time_setup
-            print(f"       -> OK ({time_setup:.2f} ms)")
 
 
             # Register a single user
@@ -774,6 +773,13 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
     avg_accumulator_batch_puncture = size_accumulator_batch_puncture / N
     avg_size_cph_pcmacpabe = size_cph / N
 
+    print(f'''{abe.name}--> {[time_setup_kyxj, time_keygen_kyxj, time_enc_kyxj, time_dec_kyxj, time_reg_user_kyxj, time_AA_setup_kyxj, time_setup_pmacpabe, time_keygen_pmacpabe, time_enc_pmacpabe,
+    time_hide_pmacpabe, time_dec_srmacpabe, time_reg_user_pmacpabe, time_AA_setup_pmacpabe,
+    time_transform, time_puncture_1, time_puncture_2, time_puncture_3, time_puncture_4, time_single_puncture,
+            time_batch_puncture, time_keygen_1, time_keygen_2, time_keygen_3, time_keygen_4, time_setup_rw,
+            time_keygen_rw, time_enc_rw, time_dec_rw, time_reg_user_rw, time_AA_setup_rw, avg_size_cph_kyxj,
+            avg_size_cph_pcmacpabe, avg_size_cph_rw, avg_accumulator_single_puncture, avg_accumulator_batch_puncture]}\n''')
+
     return [time_setup_kyxj, time_keygen_kyxj, time_enc_kyxj, time_dec_kyxj,
             time_reg_user_kyxj, time_AA_setup_kyxj, time_setup_pmacpabe, time_keygen_pmacpabe, time_enc_pmacpabe,
             time_hide_pmacpabe, time_dec_srmacpabe, time_reg_user_pmacpabe, time_AA_setup_pmacpabe,
@@ -801,7 +807,7 @@ def print_running_time(scheme_name, times, attr_number, privacy_level):
 
 # def measure_average_times(abe, attr_list, policy_str, revoked_user_list, k1, k2, k3, msg, privacy_level, epsilon_str, hidden_policy_str, N=10):
 def run_all(pairing_group, policy_size, policy_str, attr_list, puncturable_attr_dict, rw_policy_string, rw_attr_list, k1, k2, k3, msg, privacy_level, epsilon_str):
-    algos = ['#attributes', 'privacy level', 'Setup (ms)', 'KeyGen (ms)', 'Enc (ms)', 'Puncture (ms)', 'Dec (ms)', 'Ciphertext (bytes)']
+    algos = ['#attributes', 'privacy level', 'Setup (ms)', 'KeyGen (ms)', 'Hide (ms)', 'Enc (ms)', 'Puncture (ms)', 'Dec (ms)', 'Ciphertext (bytes)']
 
     n1, n2, m, i = get_par(pairing_group, policy_str, attr_list)
 
@@ -1128,6 +1134,304 @@ def main():
         print(f" the list of attributes for puncture is {puncturable_attr_dict}")
         print(f" the list of attributes for other schemes is {attr_list}")
         print(f" the policy for other schemes is {policy_str}")
+
+        list_length = int(len(attr_list) // 3)
+        attr_list_1 = attr_list[0:list_length]
+        attr_list_2 = attr_list[list_length:(2 * list_length)]
+        attr_list_3 = attr_list[(2 * list_length):len(attr_list)]
+    #
+        print(f"attr_list_1: {attr_list_1} \n")
+        print(f"attr_list_2: {attr_list_2} \n")
+        print(f"attr_list_3: {attr_list_3} \n")
+
+        # instance
+        p_mmacp_abe_instance = P_MACP_ABE(pairing_group)
+        # setup time
+        gc.collect(0)
+        gc.collect(1)
+        gc.collect(2)
+        gc.collect()
+        #
+        if debug:
+            print("we start setup \n\n")
+        #
+        sum_setup_pmacpabe = 0
+        start_setup = time.perf_counter()
+        (prv_DO, pub_DO, pk, msk) = p_mmacp_abe_instance.setup_()
+        end_setup = time.perf_counter()
+        time_setup = end_setup - start_setup
+        sum_setup_pmacpabe += time_setup
+
+
+        # Register a single user
+        # such user stands as the target user
+        sum_reg_user_pmacpabe = 0
+        start_reg =time.perf_counter()
+        # alice = abe.regUser('alice', attr_list, privacy_level)
+        # FIX: regUser needs dict, not list
+        alice = p_mmacp_abe_instance.regUser('alice', puncturable_attr_dict, privacy_level)
+
+        end_reg =time.perf_counter()
+        time_setup_1 = end_reg - start_reg
+        # sum_setup_srmacpabe += time_setup_1
+        sum_reg_user_pmacpabe += time_setup_1
+
+
+
+        # Register AAs (three AAs)
+        sum_reg_aa_pmacpabe = 0
+        start_setup_2 =time.perf_counter()
+        #
+        AA1_ID = 1
+        AA1_name = "AA_1"
+        p_mmacp_abe_instance.setupAA(AA1_ID, AA1_name, attr_list_1)
+        #
+        AA2_ID = 2
+        AA2_name = "AA_2"
+        p_mmacp_abe_instance.setupAA(AA2_ID, AA2_name, attr_list_2)
+        #
+        AA3_ID = 3
+        AA3_name = "AA_3"
+        p_mmacp_abe_instance.setupAA(AA3_ID, AA3_name, attr_list_3)
+        #
+        end_setup_2 =time.perf_counter()
+        time_setup_2 = end_setup_2 - start_setup_2
+        # sum_setup_srmacpabe += time_setup_2
+        sum_reg_aa_pmacpabe += time_setup_2
+
+
+        # DO Keygen1
+        sum_keygen_pmacpabe = 0
+        start_keygen_1 = time.perf_counter()
+        alice['DO_key'] = p_mmacp_abe_instance.keygen1(msk, alice['gid'], prv_DO, epsilon_str)
+        end_keygen_1 =time.perf_counter()
+        time_keygen = end_keygen_1 - start_keygen_1
+        sum_keygen_pmacpabe += time_keygen
+        # sum_keygen_1 += time_keygen
+
+
+        # DU hide timing
+        # DU hide timing
+        sum_hide_attr = 0
+        start_hide = time.perf_counter()
+        #
+        # we need to create subdirectories relative to the use of attributes list per AA
+        items = list(puncturable_attr_dict.items())
+        list_length = len(items) // 3
+        attr_dict_1 = dict(items[0:list_length])
+        attr_dict_2 = dict(items[list_length:(2 * list_length)])
+        attr_dict_3 = dict(items[(2 * list_length):])
+        #
+        attr_dict_1_hidden = p_mmacp_abe_instance.hide_attr(alice['gid'], alice['DO_key'], attr_dict_1)
+        attr_dict_2_hidden = p_mmacp_abe_instance.hide_attr(alice['gid'], alice['DO_key'], attr_dict_2)
+        attr_dict_3_hidden = p_mmacp_abe_instance.hide_attr(alice['gid'], alice['DO_key'], attr_dict_3)
+            #
+        end_hide = time.perf_counter()
+        time_hide = end_hide - start_hide
+        sum_hide_attr += time_hide
+
+        # mid printing
+        print(f" sum_setup_pmacpabe ->{sum_setup_pmacpabe}")
+        print(f"sum_keygen_pmacpabe ->{sum_keygen_pmacpabe}")
+        print(f"sum_hide_attr -> {sum_hide_attr}")
+
+           #  # AA keygen2
+           #  start_keygen_2 =time.perf_counter()
+           #  #
+           #  # hash_gid = abe.crs['group'].hash(str(alice['gid']), ZR)
+           #
+           #  aa_key_1 = abe.keygen2(AA_ID=1, gid=alice['gid'], S_DU=attr_dict_1_hidden ) #alice['attributes'])
+           #  print(f"the list of AA1 attributes is {attr_dict_1_hidden}")
+           #  aa_key_2 = abe.keygen2(AA_ID=2, gid=alice['gid'], S_DU=attr_dict_2_hidden) #alice['attributes'])
+           #  aa_key_3 = abe.keygen2(AA_ID=3, gid=alice['gid'], S_DU=attr_dict_3_hidden) #alice['attributes'])
+           #  #
+           #  end_keygen_2 =time.perf_counter()
+           #  time_keygen = end_keygen_2 - start_keygen_2
+           #  sum_keygen_pmacpabe += time_keygen
+           #  sum_keygen_2 += time_keygen
+           #
+           #
+           #  # TEE-CS Keygen3
+           #  start_keygen_3 =time.perf_counter()
+           #  #
+           #  alice['TK_DU'] = abe.keygen3([aa_key_1, aa_key_2, aa_key_3], alice['gid'])
+           #  #
+           #  end_keygen_3 =time.perf_counter()
+           #  time_keygen = end_keygen_3 - start_keygen_3
+           #  sum_keygen_pmacpabe += time_keygen
+           #  sum_keygen_3 += time_keygen
+           #
+           #
+           #  # DU keygen4 time
+           #  start_keygen_4 =time.perf_counter()
+           #  alice['DU_key'], alice['DU_hkey'] = abe.keygen4(alice['DO_key'], alice['TK_DU'])
+           #  end_keygen_4 =time.perf_counter()
+           #  time_keygen = end_keygen_4 - start_keygen_4
+           #  sum_keygen_pmacpabe += time_keygen
+           #  sum_keygen_4 += time_keygen
+           #
+           #  #-----------------------------------------------------------------------------------
+           #  # we can only form the hidden policy from inside this code section
+           #  # -----------------------------------------------------------------------------------
+           #  raw_attr_1 = abe.hide_by_DO(msk, attribute_value=attr_list[0], epsilon=epsilon_str)
+           #  hidden_attr_1 = abe.crs['group'].serialize(raw_attr_1, compression=False).hex().upper()
+           #
+           #  #
+           #  hidden_policy_str = f'({hidden_attr_1}'
+           # #
+           #  for att in attr_list[1:]:
+           #      raw_attr = abe.hide_by_DO(msk, attribute_value=att, epsilon=epsilon_str)
+           #      hidden_attr = abe.crs['group'].serialize(raw_attr, compression=False).hex().upper()
+           #      hidden_policy_str += f' and {hidden_attr}'
+           #  hidden_policy_str += ')'
+           #
+           #
+           #  # DO encryption
+           #  start_enc_1 =time.perf_counter()
+           #  #
+           #  ctxt = abe.encrypt(pk, msk, msg, policy_str, prv_DO, epsilon_str, hidden_policy_str)
+           #
+           #  # we get a copy of ctxt for decryption purposes since the puncturing will prevent normal decryption
+           #  # ctxt_copy = ctxt
+           #  #
+           #  end_enc_1 =time.perf_counter()
+           #  time_enc = end_enc_1 - start_enc_1
+           #  sum_enc_pmacpabe += time_enc
+           #
+           #
+           #  # size of ciphertext
+           #  size_cph += len(abe.crs['group'].serialize(ctxt['C_tilde'], compression=False)) + len(
+           #      abe.crs['group'].serialize(ctxt['C'], compression=False)) + len(
+           #      abe.crs['group'].serialize(ctxt['W'], compression=False)) + len(
+           #      abe.crs['group'].serialize(ctxt['sig_W'], compression=False)) + len(
+           #      str.encode(ctxt['policy'], encoding='utf-8')) + len(
+           #      abe.crs['group'].serialize(ctxt['ACC'].ACC_value, compression=False)) + len(
+           #      abe.crs['group'].serialize(ctxt['ACC'].acc_len, compression=False))
+           #  #
+           #  for value in ctxt['C_y'].values():
+           #      # size_cph += len(abe.crs['group'].serialize(value, compression=False))
+           #      # C_y values are ints
+           #      size_cph += len(str(value).encode('utf-8'))
+           #  #
+           #  for value in ctxt['T_y'].values():
+           #      size_cph += len(abe.crs['group'].serialize(value, compression=False))
+           #  #
+           #  for value in ctxt['C_attr'].values():
+           #      # size_cph += len(abe.crs['group'].serialize(value, compression=False))
+           #      size_cph += len(value)  # , compression=False))
+           #  #
+           #  for value in ctxt['attributes']:
+           #      size_cph += len(str.encode(value, encoding='utf-8'))
+           #  #
+           #  # for value in ctxt['ACC'].tag_list:
+           #  #     size_cph += len(str.encode(value, encoding='utf-8'))
+           #  #
+           #
+           #  # before puncturing we need to safegard the values of DU_jkey and DU_hkey as our implementation applies both sequentially
+           #  # but this can also be tolerated by our seamless design
+           #  DU_key_bak = alice['DU_key']
+           #  DU_hkey_bak = alice['DU_hkey']
+           #
+           #  # ---------------------------------------------------------------------------------------------------
+           #  # **************************user single puncturing ******************************
+           #  # ---------------------------------------------------------------------------------------------------
+           #  start_DU_puncture = time.perf_counter()
+           #  tag_to_puncture = uuid.uuid4() # we generate a legit tag
+           #  #
+           #  alice['DU_key'], alice['DU_hkey'], T_prime, desc_T_prime = abe.DU_single_puncture(
+           #          alice['DU_key'], alice['DU_hkey'], tag_to_puncture, alice['gid'], alice['k_anonymity'])
+           #  end_DU_puncture=time.perf_counter()
+           #  time_puncture1 = end_DU_puncture - start_DU_puncture
+           #  sum_puncture_1 += time_puncture1
+           #  sum_single_puncture +=  time_puncture1
+           #
+           #  # then the cloud performs the puncture to support the user  single puncture
+           #  start_CSPpuncture = time.perf_counter()
+           #  alice['DU_hkey'], ctxt['sig_ACC'] = abe.csp_puncture(ctxt, alice['DU_hkey'], T_prime, desc_T_prime, alice['gid'])
+           #  end_CSP_puncture = time.perf_counter()
+           #  time_puncture2 = end_CSP_puncture - start_CSPpuncture
+           #  sum_puncture_2 += time_puncture2
+           #  sum_single_puncture += time_puncture2
+           #
+           #  # we need to update the size of the ciphertext here
+           #  size_cph += len(abe.crs['group'].serialize(ctxt['sig_ACC'], compression=False))
+           #  #
+           #  for value in ctxt['ACC'].tag_list:
+           #      size_cph += len(str.encode(value, encoding='utf-8'))
+           #  #-------------------------------------------------------------------------------------------------------
+           #
+           #  # we need to update the size of the accumulator for single puncture here
+           #  if ctxt['ACC'].ACC_value is not None:
+           #      size_accumulator_single_puncture += len(abe.crs['group'].serialize(ctxt['ACC'].ACC_value, compression=False))
+           #  #
+           #  for value in ctxt['ACC'].tag_list:
+           #      size_accumulator_single_puncture += len(str.encode(value, encoding='utf-8'))
+           #
+           #  # ---------------------------------------------------------------------------------------------------
+           #  # **************************user batch puncturing ******************************
+           #  # ---------------------------------------------------------------------------------------------------
+           #  start_DU_puncture = time.perf_counter()
+           #  #
+           #  # use the original  secret and helper keys
+           #  alice['DU_key'] = DU_key_bak
+           #  alice['DU_hkey'] = DU_hkey_bak
+           #
+           #  # k-anonymity should be greater than the number of attributes
+           #  tag_to_puncture_list = [str(uuid.uuid4()) for _ in range(len(attr_list))] # uuid.uuid4() # we generate a legit tag
+           #  #
+           #  alice['DU_key'], alice['DU_hkey'], T_prime, desc_T_prime = abe.DU_batch_puncture(alice['DU_key'], alice['DU_hkey'], tag_to_puncture_list, alice['gid'], alice['k_anonymity'])
+           #  end_DU_puncture=time.perf_counter()
+           #  time_puncture3 = end_DU_puncture - start_DU_puncture
+           #  sum_puncture_3 += time_puncture3
+           #  sum_batch_puncture += time_puncture3
+           #
+           #  # then the cloud performs the puncture to support the user  batch puncture
+           #  start_CSPpuncture = time.perf_counter()
+           #  alice['DU_hkey'], ctxt['sig_ACC'] = abe.csp_puncture(ctxt, alice['DU_hkey'], T_prime, desc_T_prime, alice['gid'])
+           #  end_CSP_puncture = time.perf_counter()
+           #  time_puncture4 = end_CSP_puncture - start_CSPpuncture
+           #  sum_puncture_4 += time_puncture4
+           #  sum_batch_puncture += time_puncture4
+           #
+           #  # we need to update the size of the ciphertext here
+           #  for value in ctxt['ACC'].tag_list:
+           #      size_cph += len(str.encode(value, encoding='utf-8'))
+           #
+           #  # we need to update the size of the accumulator for batch puncture here
+           #  size_cph += len(abe.crs['group'].serialize(ctxt['sig_ACC'], compression=False))
+           #  #
+           #  size_accumulator_batch_puncture += len(
+           #      abe.crs['group'].serialize(ctxt['ACC'].ACC_value, compression=False)) + len(
+           #      abe.crs['group'].serialize(ctxt['ACC'].acc_len, compression=False))
+           #  #
+           #  for value in ctxt['ACC'].tag_list:
+           #      size_accumulator_batch_puncture += len(str.encode(value, encoding='utf-8'))
+           #  # -------------------------------------------------------------------------------------------------------
+           #
+           #  # TEE-CS ciphertext transformation
+           #  # outsourced decryption by the cloud
+           #  start_transform =time.perf_counter()
+           #  TC, I = abe.transform(ctxt, alice['DU_hkey'], alice['gid'])
+           #  end_transform =time.perf_counter()
+           #  time_transform = end_transform - start_transform
+           #  sum_transform += time_transform
+           #
+           #  # Final decryption stage by Data User
+           #  start_decrypt =time.perf_counter()
+           #  M2 = abe.decrypt(ctxt, TC, I, alice['DU_key'], pub_DO)
+           #  end_decrypt =time.perf_counter()
+           #  time_decrypt = end_decrypt - start_decrypt
+           #  sum_decrypt_pmacpabe += time_decrypt
+           #
+           #  # sanity check
+           #  assert msg == M2, "FAILED Decryption: message is incorrect"
+
+        # setup time
+        gc.collect(0)
+        gc.collect(1)
+        gc.collect(2)
+        gc.collect()
+    #
         run_all(pairing_group, policy_size, policy_str, attr_list, puncturable_attr_dict, rw_policy_string, rw_attr_list, k1, k2, k3, msg, privacy_level, epsilon_str)
         gc.collect(0)
         gc.collect(1)
@@ -1147,4 +1451,14 @@ def main():
 
 if __name__ == "__main__":
     debug = True
+    # # Open the log file
+    # log_file = open("measurements.log", "w")
+    #
+    # # Duplicate the file descriptors so stdout/stderr write to the file
+    # os.dup2(log_file.fileno(), sys.stdout.fileno())
+    # os.dup2(log_file.fileno(), sys.stderr.fileno())
+    #
+    # # Optional: keep a reference so Python doesn't close it prematurely
+    # sys.stdout.log_file = log_file
+    #
     main()
