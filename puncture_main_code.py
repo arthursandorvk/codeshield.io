@@ -33,7 +33,7 @@ from typing import List
 
 from collections import defaultdict
 
-from fontTools.misc.bezierTools import epsilon
+
 
 from PolicyParser_Modified import PolicyParserModified
 from accumulator import accumulator
@@ -41,7 +41,7 @@ from accumulator import accumulator
 debug = True
 
 # type annotations
-crs_t = {'g': G1, 'g': G2, 'e_gg': GT}
+crs_t = {'g': G1, 'e_gg': GT}
 
 # type annotations
 pp_t = {'h': G1, 'f': G1, 'e_gg_alpha': GT}
@@ -136,7 +136,7 @@ class P_MACP_ABE(ABEnc):
         return self.authorities[authorityid]
 
 
-    def setup(self):
+    def setup_(self):
         a0 = self.crs['group'].random(ZR)
         b0 = self.crs['group'].random(ZR)
         prv_DO = a0 * b0
@@ -152,6 +152,7 @@ class P_MACP_ABE(ABEnc):
         pp = {'h': h, 'e_gg_alpha': e_gg_alpha}
         msk = {'beta': beta, 'g_alpha': g_alpha}
         return prv_DO, pub_DO, pp, msk
+
 
     def keygen(self, pp, msk, gid):
         pass
@@ -188,7 +189,7 @@ class P_MACP_ABE(ABEnc):
             S_DU_hidden[att_name] = (att_name, hidden_att_value)
         return S_DU_hidden
 
-
+    # this is called by DO to hide attributes prior to design the access policy - not a function on its own
     def hide_by_DO(self, msk, attribute_value: str, epsilon: str):
         return (self.crs['g'] ** (self.crs['group'].hash(str(attribute_value), ZR))) * (
             self.crs['g'] ** ((self.crs['group'].hash(str(epsilon), ZR)) * (1 / (msk['beta']))))
@@ -206,7 +207,7 @@ class P_MACP_ABE(ABEnc):
 
         for att_name in list(S_DU.keys()):
             if att_name not in AA['attributes']:
-                print(f"{att_name} not in {AA['attributes']} of AA {AA_ID}")
+                # print(f"{att_name} not in {AA['attributes']} of AA {AA_ID}")
                 continue
             # print(f"we focus on attribute {att_name} of value {S_DU.get(att_name)[1]}")
             attr_value = S_DU.get(att_name)[1]
@@ -254,7 +255,7 @@ class P_MACP_ABE(ABEnc):
         desc_T_prime[tag_name] = real_tag_component
 
         DU_hkey['T'].add(tag_name)
-        DU_hkey['desc_T'][tag_name] = real_tag_component
+        # DU_hkey['desc_T'][tag_name] = real_tag_component
 
         dummy_tag_dict = {}
         dummy_tag_generated_list = [str(uuid.uuid4()) for _ in range(anonym_level - 1)]
@@ -273,7 +274,7 @@ class P_MACP_ABE(ABEnc):
             T_prime.add(dummy_tag_name)
             desc_T_prime[dummy_tag_name] = dummy_tag_component
             DU_hkey['T'].add(dummy_tag_name)
-            DU_hkey['desc_T'][dummy_tag_name] = dummy_tag_component
+            # DU_hkey['desc_T'][dummy_tag_name] = dummy_tag_component
 
         for item in DU_hkey['TK_DU']['items']:
             att_name = item[0]
@@ -310,7 +311,7 @@ class P_MACP_ABE(ABEnc):
             T_prime.add(real_tag_name)
             desc_T_prime[real_tag_name] = real_tag_component
             DU_hkey['T'].add(real_tag_name)
-            DU_hkey['desc_T'][real_tag_name] = real_tag_component
+            # DU_hkey['desc_T'][real_tag_name] = real_tag_component
 
         dummy_tag_generated_list = [str(uuid.uuid4()) for _ in range(anonym_level - len(tag_name_list))]
         dummy_tag_list_apply_hash_per_element = [self.crs['group'].hash(str(item), ZR) for item in
@@ -328,7 +329,7 @@ class P_MACP_ABE(ABEnc):
             T_prime.add(dummy_tag_name)
             desc_T_prime[dummy_tag_name] = dummy_tag_component
             DU_hkey['T'].add(dummy_tag_name)
-            DU_hkey['desc_T'][dummy_tag_name] = dummy_tag_component
+            # DU_hkey['desc_T'][dummy_tag_name] = dummy_tag_component
 
         for item in DU_hkey['TK_DU']['items']:
             att_name = item[0]
@@ -373,7 +374,7 @@ class P_MACP_ABE(ABEnc):
                 continue
             legit_tags.add(tag_name)
 
-        CT['ACC'].accumulate_tags(legit_tags)
+        CT['ACC'].accumulate_tags(self.crs, DU_hkey, legit_tags)
 
         acc_value = CT['ACC'].acc_get_value()
         sig_ACC = self.crs['g'] ** (self.crs['group'].hash(str(acc_value), ZR) * self.secret_attestation_key)
@@ -383,12 +384,12 @@ class P_MACP_ABE(ABEnc):
     def encrypt(self, pp, msk, M, policy_str, prv_DO, epsilon, hidden_policy):
         policy = self.crs['util'].createPolicy(hidden_policy)
         a_list = self.crs['util'].getAttributeList(policy)
-        print(f" the list of attributes extracted from the policy is {a_list}")
+        # print(f" the list of attributes extracted from the policy is {a_list}")
         s = self.crs['group'].random(ZR)
         self.shared_secret = s
 
         shares = self.crs['util'].calculateSharesDict(s, policy)
-        print(f" the shares dictionary is {shares}")
+        # print(f" the shares dictionary is {shares}")
         C_tilde = (pp['e_gg_alpha'] ** s) * M
         C = pp['h'] ** s
         C_y, T_y, C_attr = {}, {}, {}
@@ -411,14 +412,19 @@ class P_MACP_ABE(ABEnc):
             C_attr[j] = i
 
         # we initialize the accumulator
-        self.accumulator = accumulator(self.crs)
-        self.accumulator.acc_init()
+        self.accumulator = accumulator()
+        self.accumulator.acc_init(self.crs)
 
+        # CT = {
+        #     'C_tilde': C_tilde,
+        #     'C': C, 'C_y': C_y, 'T_y': T_y, 'C_attr': C_attr, 'policy': hidden_policy,
+        #     'attributes': [item.split('$', 1)[0] for item in a_list], 'W': W,
+        #     'sig_W': sig_W, 'ACC': self.accumulator
+        # }
         CT = {
             'C_tilde': C_tilde,
             'C': C, 'C_y': C_y, 'T_y': T_y, 'C_attr': C_attr, 'policy': hidden_policy,
-            'attributes': [item.split('$', 1)[0] for item in a_list], 'W': W,
-            'sig_W': sig_W, 'ACC': self.accumulator
+            'W': W, 'sig_W': sig_W, 'ACC': self.accumulator
         }
         return CT
 
@@ -458,14 +464,14 @@ class P_MACP_ABE(ABEnc):
             # print(f"counter---> {count} \n\n")
             count += 1
 
-        print(f" the computed value of TC is: {TC} \n")
+        # print(f" the computed value of TC is: {TC} \n")
 
         TC = (pair(self.crs['g'], self.crs['g']) ** (
             (self.random_user_exponent + self.crs['group'].hash(str(gid), ZR)) * self.shared_secret)) * (
                      (pair(self.crs['g'], self.crs['g'])) ** (self.users[gid]['prv_DU'] * self.shared_secret))
 
         self.TC = TC
-        print(f" the value of self.TC is: {self.TC} \n")
+        # print(f" the value of self.TC is: {self.TC} \n")
 
         if DU_hkey['hk_3'] is None:
             raise "DU_hkey['hk_3'] is not defined ! contact the Data Owner !"
@@ -473,7 +479,7 @@ class P_MACP_ABE(ABEnc):
             I = pair(CT['C'], DU_hkey['hk_3'])
             return TC, I
 
-    def Decrypt(self, CT, TC, I, DU_key, pub_DO):
+    def decrypt(self, CT, TC, I, DU_key, pub_DO):
         F = pair(CT['C'], DU_key['sk'])
         B = ((F * I) / TC)
         M_prime = CT['C_tilde'] / B
