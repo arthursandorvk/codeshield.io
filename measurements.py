@@ -183,11 +183,14 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             gc.collect(1)
             gc.collect(2)
             gc.collect()
+            #
+            print("[1/14] Setup...")
             start_setup = time.perf_counter()
             (prv_DO, pub_DO, pk, msk) = abe.setup_()
             end_setup = time.perf_counter()
             time_setup = end_setup - start_setup
             sum_setup_pmacpabe += time_setup
+            print(f"       -> OK ({time_setup:.2f} ms)")
 
 
             # Register a single user
@@ -257,12 +260,12 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             # AA keygen2
             start_keygen_2 =time.perf_counter()
             #
-            hash_gid = abe.crs['group'].hash(str(alice['gid']), ZR)
+            # hash_gid = abe.crs['group'].hash(str(alice['gid']), ZR)
 
-            aa_key_1 = abe.keygen2(AA_ID=1, hash_gid=hash_gid, S_DU=attr_dict_1_hidden ) #alice['attributes'])
+            aa_key_1 = abe.keygen2(AA_ID=1, gid=alice['gid'], S_DU=attr_dict_1_hidden ) #alice['attributes'])
             print(f"the list of AA1 attributes is {attr_dict_1_hidden}")
-            aa_key_2 = abe.keygen2(AA_ID=2, hash_gid=hash_gid, S_DU=attr_dict_2_hidden) #alice['attributes'])
-            aa_key_3 = abe.keygen2(AA_ID=3, hash_gid=hash_gid, S_DU=attr_dict_3_hidden) #alice['attributes'])
+            aa_key_2 = abe.keygen2(AA_ID=2, gid=alice['gid'], S_DU=attr_dict_2_hidden) #alice['attributes'])
+            aa_key_3 = abe.keygen2(AA_ID=3, gid=alice['gid'], S_DU=attr_dict_3_hidden) #alice['attributes'])
             #
             end_keygen_2 =time.perf_counter()
             time_keygen = end_keygen_2 - start_keygen_2
@@ -292,14 +295,15 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             #-----------------------------------------------------------------------------------
             # we can only form the hidden policy from inside this code section
             # -----------------------------------------------------------------------------------
-            hidden_attr_1 = abe.hide_by_DO(msk, attribute_value=attr_list[0], epsilon=epsilon_str)
-            counter = 1
+            raw_attr_1 = abe.hide_by_DO(msk, attribute_value=attr_list[0], epsilon=epsilon_str)
+            hidden_attr_1 = abe.crs['group'].serialize(raw_attr_1, compression=False).hex().upper()
+
             #
             hidden_policy_str = f'({hidden_attr_1}'
            #
             for att in attr_list[1:]:
-                hidden_attr = abe.hide_by_DO(msk, attribute_value=att, epsilon=epsilon_str)
-                counter += 1
+                raw_attr = abe.hide_by_DO(msk, attribute_value=att, epsilon=epsilon_str)
+                hidden_attr = abe.crs['group'].serialize(raw_attr, compression=False).hex().upper()
                 hidden_policy_str += f' and {hidden_attr}'
             hidden_policy_str += ')'
 
@@ -307,7 +311,7 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             # DO encryption
             start_enc_1 =time.perf_counter()
             #
-            ctxt = abe.encrypt_(pk, msk, msg, policy_str, prv_DO, epsilon_str, hidden_policy_str)
+            ctxt = abe.encrypt(pk, msk, msg, policy_str, prv_DO, epsilon_str, hidden_policy_str)
 
             # we get a copy of ctxt for decryption purposes since the puncturing will prevent normal decryption
             # ctxt_copy = ctxt
