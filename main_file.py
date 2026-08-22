@@ -1,3 +1,4 @@
+import ctypes
 from collections import defaultdict
 
 import pandas as pd
@@ -50,7 +51,7 @@ def main():
     user = puncture_maabe_obj.regUser(gid=user_gid, attributes=attrs, anonymity_level=anonymity_level)
 
     access_policy = f"(({attrs['attribute4']} or {attrs['attribute3']}) and ({attrs['attribute3']} or {attrs['attribute1']}))"
-    access_policy_schema = f"(({attrs['attribute4'].split('$',1)[0]} or {attrs['attribute3'].split('$',1)[0]}) and ({attrs['attribute3'].split('$',1)[0]} or {attrs['attribute1'].split('$',1)[0]}))"
+    access_policy_schema = f"(({attrs['attribute4'].split('$', 1)[0]} or {attrs['attribute3'].split('$', 1)[0]}) and ({attrs['attribute3'].split('$', 1)[0]} or {attrs['attribute1'].split('$', 1)[0]}))"
 
     hiden_attr_1 = puncture_maabe_obj.hide_by_DO(mk, attribute_value='ONE', epsilon='epsilon')
     hiden_attr_2 = puncture_maabe_obj.hide_by_DO(mk, attribute_value='TWO', epsilon='epsilon')
@@ -58,18 +59,23 @@ def main():
     hiden_attr_4 = puncture_maabe_obj.hide_by_DO(mk, attribute_value='FOUR', epsilon='epsilon')
 
     hidden_attrs = {}
-    hidden_attrs['attribute1'] = puncture_maabe_obj.crs['group'].serialize(hiden_attr_1, compression=False).hex().upper()
-    hidden_attrs['attribute2'] = puncture_maabe_obj.crs['group'].serialize(hiden_attr_2, compression=False).hex().upper()
-    hidden_attrs['attribute3'] = puncture_maabe_obj.crs['group'].serialize(hiden_attr_3, compression=False).hex().upper()
-    hidden_attrs['attribute4'] = puncture_maabe_obj.crs['group'].serialize(hiden_attr_4, compression=False).hex().upper()
+    hidden_attrs['attribute1'] = puncture_maabe_obj.crs['group'].serialize(hiden_attr_1,
+                                                                           compression=False).hex().upper()
+    hidden_attrs['attribute2'] = puncture_maabe_obj.crs['group'].serialize(hiden_attr_2,
+                                                                           compression=False).hex().upper()
+    hidden_attrs['attribute3'] = puncture_maabe_obj.crs['group'].serialize(hiden_attr_3,
+                                                                           compression=False).hex().upper()
+    hidden_attrs['attribute4'] = puncture_maabe_obj.crs['group'].serialize(hiden_attr_4,
+                                                                           compression=False).hex().upper()
 
     hidden_access_policy = f"(({hidden_attrs['attribute4']} or {hidden_attrs['attribute3']}) and ({hidden_attrs['attribute3']} or {hidden_attrs['attribute1']}))"
 
-    print(f" the value of the ******* hidden policy ******** is {hidden_access_policy}\n\n\n")
+    # print(f" the value of the ******* hidden policy ******** is {hidden_access_policy}\n\n\n")
 
     if debug:
         print("Unhidden Attributes =>", attrs, "\n")
         print("Policy =>", access_policy, "\n")
+        print(f"Hidden policy => {hidden_access_policy}\n")
 
     # 1- DO generate the DO Key
     do_key = puncture_maabe_obj.keygen1(mk, puncture_maabe_obj.users[user_gid].get(user_gid), prv_DO, epsilon_value)
@@ -81,7 +87,7 @@ def main():
     # AAs compute Keygen2
     aa_key_1 = puncture_maabe_obj.keygen2(AA_ID=1, gid=puncture_maabe_obj.users[user_gid].get('gid'),
                                           S_DU=puncture_maabe_obj.users[user_gid]['attributes'])
-    print(f" the gid is {puncture_maabe_obj.users[user_gid].get('gid')} and the set of attributes is {puncture_maabe_obj.users[user_gid].get('attributes')} \n\n")
+    # print(f" the gid is {puncture_maabe_obj.users[user_gid].get('gid')} and the set of attributes is {puncture_maabe_obj.users[user_gid].get('attributes')} \n\n")
 
     aa_key_2 = puncture_maabe_obj.keygen2(AA_ID=2, gid=puncture_maabe_obj.users[user_gid].get('gid'),
                                           S_DU=puncture_maabe_obj.users[user_gid]['attributes'])
@@ -105,41 +111,40 @@ def main():
 
     CT = puncture_maabe_obj.encrypt(pk, mk, rand_msg, access_policy, prv_DO, epsilon_value, hidden_access_policy)
 
-
     if puncturing is True:
         # we perform puncture operations
-            if single_puncture:
-                print("\n=== SINGLE TAG PUNCTURING ===\n")
-                tag_to_puncture = "revoked_user_001"
-                DU_key, DU_hkey, T_prime, desc_T_prime = puncture_maabe_obj.DU_single_puncture(
-                    DU_key, DU_hkey, tag_to_puncture, user_gid, anonymity_level)
-                print(f"Punctured tag: {tag_to_puncture}")
-                print(f"Anonymous set size: {len(T_prime)} (1 real + {anonymity_level - 1} dummy)")
-            else:
-                print("\n=== BATCH TAG PUNCTURING ===\n")
-                tags_to_puncture = {"revoked_user_001", "revoked_user_002", "revoked_user_003"}
-                DU_key, DU_hkey, T_prime, desc_T_prime = puncture_maabe_obj.DU_batch_puncture(
+        if single_puncture:
+            print("\n=== SINGLE TAG PUNCTURING ===\n")
+            tag_to_puncture = "revoked_user_001"
+            DU_key, DU_hkey, T_prime, desc_T_prime = puncture_maabe_obj.DU_single_puncture(
+                DU_key, DU_hkey, tag_to_puncture, user_gid, anonymity_level)
+            print(f"Punctured tag: {tag_to_puncture}")
+            print(f"Anonymous set size: {len(T_prime)} (1 real + {anonymity_level - 1} dummy)")
+        else:
+            print("\n=== BATCH TAG PUNCTURING ===\n")
+            tags_to_puncture = {"revoked_user_001", "revoked_user_002", "revoked_user_003"}
+            DU_key, DU_hkey, T_prime, desc_T_prime = puncture_maabe_obj.DU_batch_puncture(
                 DU_key, DU_hkey, tags_to_puncture, user_gid, anonymity_level)
-                print(f"Punctured tags: {tags_to_puncture}")
-                print(f"Anonymous set size: {len(T_prime)} ({len(tags_to_puncture)} real + {anonymity_level - len(tags_to_puncture)} dummy)")
+            print(f"Punctured tags: {tags_to_puncture}")
+            print(
+                f"Anonymous set size: {len(T_prime)} ({len(tags_to_puncture)} real + {anonymity_level - len(tags_to_puncture)} dummy)")
 
-            # DU outsources remaining puncturing to CSP
-            DU_hkey, sig_ACC = puncture_maabe_obj.csp_puncture(
-                CT, DU_hkey, T_prime, desc_T_prime, user_gid)
+        # DU outsources remaining puncturing to CSP
+        DU_hkey, sig_ACC = puncture_maabe_obj.csp_puncture(
+            CT, DU_hkey, T_prime, desc_T_prime, user_gid)
 
-            # Store CSP attestation data in CT for verification
-            CT['sig_ACC'] = sig_ACC
+        # Store CSP attestation data in CT for verification
+        CT['sig_ACC'] = sig_ACC
 
-
-            print(f"Accumulator value after CSP puncturing: {CT['ACC'].acc_get_value()}")
-            print(f"Accumulator size: {CT['ACC'].acc_get_size()}")
-            print(f"CSP attestation signature generated.\n")
+        # print(f"Accumulator value after CSP puncturing: {CT['ACC'].acc_get_value()}")
+        # print(f"Accumulator size: {CT['ACC'].acc_get_size()}")
+        # print(f"CSP attestation signature generated.\n")
 
     # ******************Transform******************
     TC, I = puncture_maabe_obj.transform(CT=CT, DU_hkey=DU_hkey, gid=puncture_maabe_obj.users[user_gid].get('gid'))
 
     # ******************Decrypt******************
-    rec_msg = puncture_maabe_obj.Decrypt(CT, TC, I, DU_key, pub_DO)
+    rec_msg = puncture_maabe_obj.decrypt(CT, TC, I, DU_key, pub_DO)
 
     if (rand_msg != rec_msg):
         #
@@ -159,17 +164,18 @@ def main():
         # we can verify accumulator attestation signature
         acc_val = CT['ACC'].acc_get_value()
         left_pair = pair(puncture_maabe_obj.crs['g'], CT['sig_ACC'])
-        right_pair = pair(puncture_maabe_obj.crs['g'] ** puncture_maabe_obj.crs['group'].hash(str(acc_val), ZR), puncture_maabe_obj.public_attestation_key)
+        right_pair = pair(puncture_maabe_obj.crs['g'] ** puncture_maabe_obj.crs['group'].hash(str(acc_val), ZR),
+                          puncture_maabe_obj.public_attestation_key)
         assert left_pair == right_pair, "Accumulator attestation signature verification failed!"
         print("Accumulator attestation signature verified successfully.")
 
 
 if __name__ == "__main__":
-    debug = False
+    debug = True
     # ******************PUNCTURING PHASE******************
     # whether to puncture or not
-    puncturing = True
+    puncturing = False
     # whether to perform batch or single puncture
-    single_puncture = True
+    single_puncture = False
     #
     main()
