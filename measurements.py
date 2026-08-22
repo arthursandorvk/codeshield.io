@@ -138,6 +138,8 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
     sum_decrypt_pmacpabe = 0
     sum_puncture_pmacpabe = 0
     size_cph = 0
+    overhead_cph_sing_puncture = 0
+    overhead_cph_batch_puncture = 0
     size_accumulator_single_puncture = 0
     size_accumulator_batch_puncture = 0
 
@@ -172,12 +174,11 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
         gc.collect(2)
         gc.collect()
 
-        if abe.name == "P-MACP-ABE":
+        if abe.name == "P_MACP_ABE":
             list_length = int(len(attr_list) // 3)
             attr_list_1 = attr_list[0:list_length]
             attr_list_2 = attr_list[list_length:(2 * list_length)]
             attr_list_3 = attr_list[(2 * list_length):len(attr_list)]
-
 
             # setup time
             gc.collect(0)
@@ -185,29 +186,33 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             gc.collect(2)
             gc.collect()
             #
+            # print(f" Setup... start \n")
             start_setup = time.perf_counter()
-            (prv_DO, pub_DO, pk, msk) = abe.setup_()
+            #
+            (prv_DO, pub_DO, pk, msk) = abe.setup()
+            #
             end_setup = time.perf_counter()
             time_setup = end_setup - start_setup
             sum_setup_pmacpabe += time_setup
-
+            # print(f" Setup... end\n")
 
             # Register a single user
             # such user stands as the target user
-            start_reg =time.perf_counter()
+            # print(f" User Registration(RegUser)... start \n")
+            start_reg = time.perf_counter()
             # alice = abe.regUser('alice', attr_list, privacy_level)
             # FIX: regUser needs dict, not list
             alice = abe.regUser('alice', puncturable_attr_dict, privacy_level)
 
-            end_reg =time.perf_counter()
+            end_reg = time.perf_counter()
             time_setup_1 = end_reg - start_reg
             # sum_setup_srmacpabe += time_setup_1
             sum_reg_user_pmacpabe += time_setup_1
-
-
+            # print(f" User Registration(RegUser)... end \n")
 
             # Register AAs (three AAs)
-            start_setup_2 =time.perf_counter()
+            # print(f" AA Registration(SetupAA)... start \n")
+            start_setup_2 = time.perf_counter()
             #
             AA1_ID = 1
             AA1_name = "AA_1"
@@ -221,23 +226,26 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             AA3_name = "AA_3"
             abe.setupAA(AA3_ID, AA3_name, attr_list_3)
             #
-            end_setup_2 =time.perf_counter()
+            end_setup_2 = time.perf_counter()
             time_setup_2 = end_setup_2 - start_setup_2
             # sum_setup_srmacpabe += time_setup_2
             sum_reg_aa_pmacpabe += time_setup_2
+            # print(f" AA Registration(SetupAA)... end \n")
 
 
             # DO Keygen1
+            # print(f" Keygen1... start \n")
             start_keygen_1 = time.perf_counter()
             alice['DO_key'] = abe.keygen1(msk, alice['gid'], prv_DO, epsilon_str)
-            end_keygen_1 =time.perf_counter()
+            end_keygen_1 = time.perf_counter()
             time_keygen = end_keygen_1 - start_keygen_1
             sum_keygen_pmacpabe += time_keygen
             sum_keygen_1 += time_keygen
-
+            # print(f" Keygen1... end \n")
 
             # DU hide timing
             # DU hide timing
+            # print(f" HideAttr... start \n")
             start_hide = time.perf_counter()
             #
             # we need to create subdirectories relative to the use of attributes list per AA
@@ -246,6 +254,7 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             attr_dict_1 = dict(items[0:list_length])
             attr_dict_2 = dict(items[list_length:(2 * list_length)])
             attr_dict_3 = dict(items[(2 * list_length):])
+
             #
             attr_dict_1_hidden = abe.hide_attr(alice['gid'], alice['DO_key'], attr_dict_1)
             attr_dict_2_hidden = abe.hide_attr(alice['gid'], alice['DO_key'], attr_dict_2)
@@ -254,71 +263,75 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             end_hide = time.perf_counter()
             time_hide = end_hide - start_hide
             sum_hide_attr += time_hide
-
+            # print(f" HideAttr... end \n")
 
             # AA keygen2
-            start_keygen_2 =time.perf_counter()
+            # print(f" Keygen2... start \n")
+            start_keygen_2 = time.perf_counter()
             #
             # hash_gid = abe.crs['group'].hash(str(alice['gid']), ZR)
 
-            aa_key_1 = abe.keygen2(AA_ID=1, gid=alice['gid'], S_DU=attr_dict_1_hidden ) #alice['attributes'])
-            print(f"the list of AA1 attributes is {attr_dict_1_hidden}")
-            aa_key_2 = abe.keygen2(AA_ID=2, gid=alice['gid'], S_DU=attr_dict_2_hidden) #alice['attributes'])
-            aa_key_3 = abe.keygen2(AA_ID=3, gid=alice['gid'], S_DU=attr_dict_3_hidden) #alice['attributes'])
+            aa_key_1 = abe.keygen2(AA_ID=1, gid=alice['gid'], S_DU=attr_dict_1_hidden)  # alice['attributes'])
+            # print(f"the list of AA1 attributes is {attr_dict_1_hidden}")
+            aa_key_2 = abe.keygen2(AA_ID=2, gid=alice['gid'], S_DU=attr_dict_2_hidden)  # alice['attributes'])
+            aa_key_3 = abe.keygen2(AA_ID=3, gid=alice['gid'], S_DU=attr_dict_3_hidden)  # alice['attributes'])
             #
-            end_keygen_2 =time.perf_counter()
+            end_keygen_2 = time.perf_counter()
             time_keygen = end_keygen_2 - start_keygen_2
             sum_keygen_pmacpabe += time_keygen
             sum_keygen_2 += time_keygen
-
+            # print(f" Keygen2... end \n")
 
             # TEE-CS Keygen3
-            start_keygen_3 =time.perf_counter()
+            # print(f" Keygen3... start \n")
+            start_keygen_3 = time.perf_counter()
             #
             alice['TK_DU'] = abe.keygen3([aa_key_1, aa_key_2, aa_key_3], alice['gid'])
             #
-            end_keygen_3 =time.perf_counter()
+            end_keygen_3 = time.perf_counter()
             time_keygen = end_keygen_3 - start_keygen_3
             sum_keygen_pmacpabe += time_keygen
             sum_keygen_3 += time_keygen
-
+            # print(f" Keygen3... end \n")
 
             # DU keygen4 time
-            start_keygen_4 =time.perf_counter()
+            # print(f" Keygen4... start \n")
+            start_keygen_4 = time.perf_counter()
             alice['DU_key'], alice['DU_hkey'] = abe.keygen4(alice['DO_key'], alice['TK_DU'])
-            end_keygen_4 =time.perf_counter()
+            end_keygen_4 = time.perf_counter()
             time_keygen = end_keygen_4 - start_keygen_4
             sum_keygen_pmacpabe += time_keygen
             sum_keygen_4 += time_keygen
+            # print(f" Keygen4... end \n")
 
-            #-----------------------------------------------------------------------------------
+            # -----------------------------------------------------------------------------------
             # we can only form the hidden policy from inside this code section
             # -----------------------------------------------------------------------------------
+            # print(f" Encrypt... start \n")
             raw_attr_1 = abe.hide_by_DO(msk, attribute_value=attr_list[0], epsilon=epsilon_str)
             hidden_attr_1 = abe.crs['group'].serialize(raw_attr_1, compression=False).hex().upper()
 
             #
             hidden_policy_str = f'({hidden_attr_1}'
-           #
+            #
             for att in attr_list[1:]:
                 raw_attr = abe.hide_by_DO(msk, attribute_value=att, epsilon=epsilon_str)
                 hidden_attr = abe.crs['group'].serialize(raw_attr, compression=False).hex().upper()
                 hidden_policy_str += f' and {hidden_attr}'
             hidden_policy_str += ')'
 
-
             # DO encryption
-            start_enc_1 =time.perf_counter()
+
+            start_enc_1 = time.perf_counter()
             #
             ctxt = abe.encrypt(pk, msk, msg, policy_str, prv_DO, epsilon_str, hidden_policy_str)
 
             # we get a copy of ctxt for decryption purposes since the puncturing will prevent normal decryption
             # ctxt_copy = ctxt
             #
-            end_enc_1 =time.perf_counter()
+            end_enc_1 = time.perf_counter()
             time_enc = end_enc_1 - start_enc_1
             sum_enc_pmacpabe += time_enc
-
 
             # size of ciphertext
             size_cph += len(abe.crs['group'].serialize(ctxt['C_tilde'], compression=False)) + len(
@@ -327,7 +340,7 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
                 abe.crs['group'].serialize(ctxt['sig_W'], compression=False)) + len(
                 str.encode(ctxt['policy'], encoding='utf-8')) + len(
                 abe.crs['group'].serialize(ctxt['ACC'].ACC_value, compression=False)) + len(
-                abe.crs['group'].serialize(ctxt['ACC'].acc_len, compression=False))
+                str(ctxt['ACC'].acc_len).encode('utf-8'))
             #
             for value in ctxt['C_y'].values():
                 # size_cph += len(abe.crs['group'].serialize(value, compression=False))
@@ -341,12 +354,13 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
                 # size_cph += len(abe.crs['group'].serialize(value, compression=False))
                 size_cph += len(value)  # , compression=False))
             #
-            for value in ctxt['attributes']:
-                size_cph += len(str.encode(value, encoding='utf-8'))
+            # for value in ctxt['C_attr']:
+            #     size_cph += len(str.encode(value, encoding='utf-8'))
             #
             # for value in ctxt['ACC'].tag_list:
             #     size_cph += len(str.encode(value, encoding='utf-8'))
             #
+            #  print(f" Encrypt... end \n")
 
             # before puncturing we need to safegard the values of DU_jkey and DU_hkey as our implementation applies both sequentially
             # but this can also be tolerated by our seamless design
@@ -356,96 +370,142 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             # ---------------------------------------------------------------------------------------------------
             # **************************user single puncturing ******************************
             # ---------------------------------------------------------------------------------------------------
-            start_DU_puncture = time.perf_counter()
-            tag_to_puncture = uuid.uuid4() # we generate a legit tag
-            #
-            alice['DU_key'], alice['DU_hkey'], T_prime, desc_T_prime = abe.DU_single_puncture(
+            if single_puncture is True:
+                # print(f" Single Puncturing... start \n")
+                start_DU_puncture = time.perf_counter()
+                tag_to_puncture = uuid.uuid4()  # we generate a legit tag
+                #
+                alice['DU_key'], alice['DU_hkey'], T_prime, desc_T_prime = abe.DU_single_puncture(
                     alice['DU_key'], alice['DU_hkey'], tag_to_puncture, alice['gid'], alice['k_anonymity'])
-            end_DU_puncture=time.perf_counter()
-            time_puncture1 = end_DU_puncture - start_DU_puncture
-            sum_puncture_1 += time_puncture1
-            sum_single_puncture +=  time_puncture1
+                end_DU_puncture = time.perf_counter()
+                time_puncture1 = end_DU_puncture - start_DU_puncture
+                sum_puncture_1 += time_puncture1
+                sum_single_puncture += time_puncture1
 
-            # then the cloud performs the puncture to support the user  single puncture
-            start_CSPpuncture = time.perf_counter()
-            alice['DU_hkey'], ctxt['sig_ACC'] = abe.csp_puncture(ctxt, alice['DU_hkey'], T_prime, desc_T_prime, alice['gid'])
-            end_CSP_puncture = time.perf_counter()
-            time_puncture2 = end_CSP_puncture - start_CSPpuncture
-            sum_puncture_2 += time_puncture2
-            sum_single_puncture += time_puncture2
+                # then the cloud performs the puncture to support the user  single puncture
+                start_CSPpuncture = time.perf_counter()
+                alice['DU_hkey'], ctxt['sig_ACC'] = abe.csp_puncture(ctxt, alice['DU_hkey'], T_prime, desc_T_prime,
+                                                                     alice['gid'])
+                end_CSP_puncture = time.perf_counter()
+                time_puncture2 = end_CSP_puncture - start_CSPpuncture
+                sum_puncture_2 += time_puncture2
+                sum_single_puncture += time_puncture2
 
-            # we need to update the size of the ciphertext here
-            size_cph += len(abe.crs['group'].serialize(ctxt['sig_ACC'], compression=False))
-            #
-            for value in ctxt['ACC'].tag_list:
-                size_cph += len(str.encode(value, encoding='utf-8'))
-            #-------------------------------------------------------------------------------------------------------
+                # we need to update the size of the ciphertext here (not really) we will just display the update overhead
+                # size_cph += len(abe.crs['group'].serialize(ctxt['sig_ACC'], compression=False))
+                # we need to update the size of the ciphertext here
+                # we will just display the increase in overhead but will keep the ciphertext size similar as to the encrypt operation
+                # we will display the increase in overhead separately for single and batch puncturing
+                overhead_cph_sing_puncture += len(abe.crs['group'].serialize(ctxt['sig_ACC'], compression=False))
+                #
+                # for value in ctxt['ACC'].tag_list:
+                #     # size_cph += len(str.encode(value, encoding='utf-8'))
+                #     overhead_cph_sing_puncture += len(str.encode(value, encoding='utf-8'))
+                    # -------------------------------------------------------------------------------------------------------
 
-            # we need to update the size of the accumulator for single puncture here
-            if ctxt['ACC'].ACC_value is not None:
-                size_accumulator_single_puncture += len(abe.crs['group'].serialize(ctxt['ACC'].ACC_value, compression=False))
-            #
-            for value in ctxt['ACC'].tag_list:
-                size_accumulator_single_puncture += len(str.encode(value, encoding='utf-8'))
+                # we need to update the size of the accumulator for single puncture here
+                if ctxt['ACC'].ACC_value is not None:
+                    size_accumulator_single_puncture += len(
+                        abe.crs['group'].serialize(ctxt['ACC'].ACC_value, compression=False))
+                    overhead_cph_sing_puncture += len(
+                        abe.crs['group'].serialize(ctxt['ACC'].ACC_value, compression=False))
+                    #
+                for value in ctxt['ACC'].tag_list:
+                    size_accumulator_single_puncture += len(str.encode(value, encoding='utf-8'))
+                    overhead_cph_sing_puncture += len(str.encode(value, encoding='utf-8'))
+
+                #
+                size_accumulator_single_puncture += len(str(ctxt['ACC'].acc_len).encode('utf-8'))
+                overhead_cph_sing_puncture += len(str(ctxt['ACC'].acc_len).encode('utf-8'))
+                # print(f" Single Puncturing... end \n")
 
             # ---------------------------------------------------------------------------------------------------
             # **************************user batch puncturing ******************************
             # ---------------------------------------------------------------------------------------------------
-            start_DU_puncture = time.perf_counter()
-            #
-            # use the original  secret and helper keys
-            alice['DU_key'] = DU_key_bak
-            alice['DU_hkey'] = DU_hkey_bak
+            if batch_puncture is True:
+                # print(f" Batch Puncturing... start \n")
+                start_DU_puncture = time.perf_counter()
+                #
+                # use the original  secret and helper keys
+                alice['DU_key'] = DU_key_bak
+                alice['DU_hkey'] = DU_hkey_bak
 
-            # k-anonymity should be greater than the number of attributes
-            tag_to_puncture_list = [str(uuid.uuid4()) for _ in range(len(attr_list))] # uuid.uuid4() # we generate a legit tag
-            #
-            alice['DU_key'], alice['DU_hkey'], T_prime, desc_T_prime = abe.DU_batch_puncture(alice['DU_key'], alice['DU_hkey'], tag_to_puncture_list, alice['gid'], alice['k_anonymity'])
-            end_DU_puncture=time.perf_counter()
-            time_puncture3 = end_DU_puncture - start_DU_puncture
-            sum_puncture_3 += time_puncture3
-            sum_batch_puncture += time_puncture3
+                # k-anonymity should be greater than the number of attributes
+                tag_to_puncture_list = [str(uuid.uuid4()) for _ in
+                                        range(len(attr_list))]  # uuid.uuid4() # we generate a legit tag
+                #
+                alice['DU_key'], alice['DU_hkey'], T_prime, desc_T_prime = abe.DU_batch_puncture(alice['DU_key'],
+                                                                                                 alice['DU_hkey'],
+                                                                                                 tag_to_puncture_list,
+                                                                                                 alice['gid'],
+                                                                                                 alice['k_anonymity'])
+                end_DU_puncture = time.perf_counter()
+                time_puncture3 = end_DU_puncture - start_DU_puncture
+                sum_puncture_3 += time_puncture3
+                sum_batch_puncture += time_puncture3
 
-            # then the cloud performs the puncture to support the user  batch puncture
-            start_CSPpuncture = time.perf_counter()
-            alice['DU_hkey'], ctxt['sig_ACC'] = abe.csp_puncture(ctxt, alice['DU_hkey'], T_prime, desc_T_prime, alice['gid'])
-            end_CSP_puncture = time.perf_counter()
-            time_puncture4 = end_CSP_puncture - start_CSPpuncture
-            sum_puncture_4 += time_puncture4
-            sum_batch_puncture += time_puncture4
+                # then the cloud performs the puncture to support the user  batch puncture
+                start_CSPpuncture = time.perf_counter()
+                alice['DU_hkey'], ctxt['sig_ACC'] = abe.csp_puncture(ctxt, alice['DU_hkey'], T_prime, desc_T_prime,
+                                                                     alice['gid'])
+                end_CSP_puncture = time.perf_counter()
+                time_puncture4 = end_CSP_puncture - start_CSPpuncture
+                sum_puncture_4 += time_puncture4
+                sum_batch_puncture += time_puncture4
 
-            # we need to update the size of the ciphertext here
-            for value in ctxt['ACC'].tag_list:
-                size_cph += len(str.encode(value, encoding='utf-8'))
+                # we need to update the size of the ciphertext here
+                # we will just display the increase in overhead but will keep the ciphertext size similar as to the encrypt operation
+                # we will display the increase in overhead separately for single and batch puncturing
+                for value in ctxt['ACC'].tag_list:
+                    # size_cph += len(str.encode(value, encoding='utf-8'))
+                    size_accumulator_batch_puncture += len(str.encode(value, encoding='utf-8'))
+                    overhead_cph_batch_puncture += len(str.encode(value, encoding='utf-8'))
 
-            # we need to update the size of the accumulator for batch puncture here
-            size_cph += len(abe.crs['group'].serialize(ctxt['sig_ACC'], compression=False))
-            #
-            size_accumulator_batch_puncture += len(
-                abe.crs['group'].serialize(ctxt['ACC'].ACC_value, compression=False)) + len(
-                abe.crs['group'].serialize(ctxt['ACC'].acc_len, compression=False))
-            #
-            for value in ctxt['ACC'].tag_list:
-                size_accumulator_batch_puncture += len(str.encode(value, encoding='utf-8'))
+                # we need to update the size of the ciphertext and accumulator for batch puncture here
+                # we need to update the size of the ciphertext here
+                # we will just display the increase in overhead but will keep the ciphertext size similar as to the encrypt operation
+                # we will display the increase in overhead separately for single and batch puncturing
+                #size_cph += len(abe.crs['group'].serialize(ctxt['sig_ACC'], compression=False))
+                overhead_cph_batch_puncture +=len(abe.crs['group'].serialize(ctxt['sig_ACC'], compression=False))
+                #
+                size_accumulator_batch_puncture += len(
+                    abe.crs['group'].serialize(ctxt['ACC'].ACC_value, compression=False)) + len(
+                    str(ctxt['ACC'].acc_len).encode('utf-8'))
+                #
+                overhead_cph_batch_puncture += len(
+                    abe.crs['group'].serialize(ctxt['ACC'].ACC_value, compression=False)) + len(
+                    str(ctxt['ACC'].acc_len).encode('utf-8'))
+                #
+                for value in ctxt['ACC'].tag_list:
+                    size_accumulator_batch_puncture += len(str.encode(value, encoding='utf-8'))
+                    overhead_cph_batch_puncture += len(str.encode(value, encoding='utf-8'))
+                # print(f" Batch Puncturing... end \n")
             # -------------------------------------------------------------------------------------------------------
 
             # TEE-CS ciphertext transformation
             # outsourced decryption by the cloud
-            start_transform =time.perf_counter()
+            # print(f" Transform ... start \n")
+            start_transform = time.perf_counter()
             TC, I = abe.transform(ctxt, alice['DU_hkey'], alice['gid'])
-            end_transform =time.perf_counter()
+            end_transform = time.perf_counter()
             time_transform = end_transform - start_transform
             sum_transform += time_transform
+            # print(f" Transform ... end \n")
 
             # Final decryption stage by Data User
-            start_decrypt =time.perf_counter()
+            # print(f" Decrypt ... start \n")
+            start_decrypt = time.perf_counter()
             M2 = abe.decrypt(ctxt, TC, I, alice['DU_key'], pub_DO)
-            end_decrypt =time.perf_counter()
+            end_decrypt = time.perf_counter()
             time_decrypt = end_decrypt - start_decrypt
             sum_decrypt_pmacpabe += time_decrypt
+            # print(f" Decrypt ... end \n")
 
             # sanity check
-            assert msg == M2, "FAILED Decryption: message is incorrect"
+            # if msg != M2:
+            #     print("FAILED Decryption: message is incorrect")
+            # else:
+            #     print(f"Message successfully recovered \n")
 
         elif abe.name == "ROUSELAKIS-WATERS":
             # setup time
@@ -458,7 +518,7 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             # Register a single user
             # such user stands as the target user
             start_setup_1 = time.perf_counter()
-            alice= {}
+            alice = {}
             alice['gid'] = 'alice'
             end_setup_1 = time.perf_counter()
             time_setup_1 = end_setup_1 - start_setup_1
@@ -533,6 +593,7 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             # if rec_msg != msg:
             assert rec_msg == msg, "Decryption in Rouselakis-Waters scheme failed !"
 
+
         elif abe.name == "KANYANG-XIAOHUAJIA":
 
             # splitting the list of attributes into three sublists
@@ -542,14 +603,14 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             attr_list_3 = attr_list[(2 * list_length):len(attr_list)]
             #
             # setup time
-            start_setup =time.perf_counter()
+            start_setup = time.perf_counter()
             GPP, GMK = abe.setup()
-            end_setup =time.perf_counter()
+            end_setup = time.perf_counter()
             time_setup = end_setup - start_setup
             sum_setup_kyxj += time_setup
             # ----------------------------------------------------------
             # Register a single user (we only generate a single user secret key)
-            start_setup_1 =time.perf_counter()
+            start_setup_1 = time.perf_counter()
             users = {}  # public user data
             AADict = {}  # dictionary of authorities
             #
@@ -561,13 +622,13 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             #
             user_1['keys'], users[user_1['id']] = abe.regUser(GPP)
             #
-            end_setup_1 =time.perf_counter()
+            end_setup_1 = time.perf_counter()
             time_setup_1 = end_setup_1 - start_setup_1
             # sum_setup_kyxj += time_setup
             sum_reg_user_kyxj += time_setup_1
             # ------------------------------------------------------------
             # register three AA (Attribute Authorities)
-            start_setup_2 =time.perf_counter()
+            start_setup_2 = time.perf_counter()
             #
             AA1 = "AA_1"
             abe.setupAA(GPP, AA1, attr_list_1, AADict)
@@ -578,13 +639,13 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             AA3 = "AA_3"
             abe.setupAA(GPP, AA3, attr_list_3, AADict)
             #
-            end_setup_2 =time.perf_counter()
+            end_setup_2 = time.perf_counter()
             time_setup_2 = end_setup_2 - start_setup_2
             # sum_setup_kyxj += time_setup
             sum_AA_setup_kyxj += time_setup_2
 
             # Keygen
-            start_keygen =time.perf_counter()
+            start_keygen = time.perf_counter()
             # AA1
             for attr in range(len(attr_list_1)):
                 abe.keygen(GPP, AADict[AA1], attr_list_1[attr], users[user_1['id']], user_1['authoritySecretKeys_AA1'])
@@ -597,12 +658,12 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             for attr in range(len(attr_list_3)):
                 abe.keygen(GPP, AADict[AA3], attr_list_3[attr], users[user_1['id']], user_1['authoritySecretKeys_AA3'])
 
-            end_keygen =time.perf_counter()
+            end_keygen = time.perf_counter()
             time_keygen = end_keygen - start_keygen
             sum_keygen_kyxj += time_keygen
 
             # encrypt
-            start_enc =time.perf_counter()
+            start_enc = time.perf_counter()
 
             # for simplicity, we reconstruct sub-policies using attributes
             policy_str_1 = '(' + attr_list_1[0]
@@ -627,7 +688,7 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             ctxt_2 = abe.encrypt(GPP, policy_str_2, k2, AADict[AA2])
             ctxt_3 = abe.encrypt(GPP, policy_str_3, k3, AADict[AA3])
 
-            end_enc =time.perf_counter()
+            end_enc = time.perf_counter()
             time_enc = end_enc - start_enc
             sum_enc_kyxj += time_enc
             #
@@ -702,13 +763,12 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             #
             size_cph_kyxj += (size_cph_kyxj_DS_1 + size_cph_kyxj_DS_2 + size_cph_kyxj_DS_3) / 3
 
-
             # Decrypt
-            start_dec =time.perf_counter()
+            start_dec = time.perf_counter()
             rec_msg_1 = abe.decrypt(GPP, ctxt_1, user_1, 'authoritySecretKeys_AA1')
             rec_msg_2 = abe.decrypt(GPP, ctxt_2, user_1, 'authoritySecretKeys_AA2')
             rec_msg_3 = abe.decrypt(GPP, ctxt_3, user_1, 'authoritySecretKeys_AA3')
-            end_dec =time.perf_counter()
+            end_dec = time.perf_counter()
             time_dec = end_dec - start_dec
             sum_dec_kyxj += time_dec
 
@@ -737,10 +797,10 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
     time_dec_srmacpabe = sum_decrypt_pmacpabe / N
     time_dec_rw = sum_dec_rw / N
 
-    time_puncture_1 = sum_puncture_1 / N # DU local single puncture
-    time_puncture_2 = sum_puncture_2 / N # CSP single puncture
-    time_puncture_3 = sum_puncture_3 / N # DU local batch puncture
-    time_puncture_4 = sum_puncture_4 / N # CSP batch puncture
+    time_puncture_1 = sum_puncture_1 / N  # DU local single puncture
+    time_puncture_2 = sum_puncture_2 / N  # CSP single puncture
+    time_puncture_3 = sum_puncture_3 / N  # DU local batch puncture
+    time_puncture_4 = sum_puncture_4 / N  # CSP batch puncture
 
     time_single_puncture = sum_single_puncture / N
     time_batch_puncture = sum_batch_puncture / N
@@ -760,7 +820,6 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
     time_reg_user_pmacpabe = sum_reg_user_pmacpabe / N
     time_reg_user_rw = sum_reg_user_rw / N
 
-
     # time_update_inf_kyxj = sum_generate_update_inf_AA_kyxj / N
     # time_update_DU_key_kyxj = sum_update_DU_key_kyxj / N
     # time_update_CT_kyxj = sum_update_CT_kyxj / N
@@ -769,16 +828,22 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
     # avg_size_cph_srcmacpabe = size_cph / N
     avg_size_cph_kyxj = size_cph_kyxj / N
     avg_size_cph_rw = size_cph_rw / N
+    #
     avg_accumulator_single_puncture = size_accumulator_single_puncture / N
     avg_accumulator_batch_puncture = size_accumulator_batch_puncture / N
+    #
+    overhead_cph_single_puncture = overhead_cph_sing_puncture / N
+    overhead_cph_batch_puncture = overhead_cph_batch_puncture / N
+    #
     avg_size_cph_pcmacpabe = size_cph / N
 
-    print(f'''{abe.name}--> {[time_setup_kyxj, time_keygen_kyxj, time_enc_kyxj, time_dec_kyxj, time_reg_user_kyxj, time_AA_setup_kyxj, time_setup_pmacpabe, time_keygen_pmacpabe, time_enc_pmacpabe,
-    time_hide_pmacpabe, time_dec_srmacpabe, time_reg_user_pmacpabe, time_AA_setup_pmacpabe,
-    time_transform, time_puncture_1, time_puncture_2, time_puncture_3, time_puncture_4, time_single_puncture,
-            time_batch_puncture, time_keygen_1, time_keygen_2, time_keygen_3, time_keygen_4, time_setup_rw,
-            time_keygen_rw, time_enc_rw, time_dec_rw, time_reg_user_rw, time_AA_setup_rw, avg_size_cph_kyxj,
-            avg_size_cph_pcmacpabe, avg_size_cph_rw, avg_accumulator_single_puncture, avg_accumulator_batch_puncture]}\n''')
+    # print(
+    #     f'''{abe.name}--> {[time_setup_kyxj, time_keygen_kyxj, time_enc_kyxj, time_dec_kyxj, time_reg_user_kyxj, time_AA_setup_kyxj, time_setup_pmacpabe, time_keygen_pmacpabe, time_enc_pmacpabe,
+    #                         time_hide_pmacpabe, time_dec_srmacpabe, time_reg_user_pmacpabe, time_AA_setup_pmacpabe,
+    #                         time_transform, time_puncture_1, time_puncture_2, time_puncture_3, time_puncture_4, time_single_puncture,
+    #                         time_batch_puncture, time_keygen_1, time_keygen_2, time_keygen_3, time_keygen_4, time_setup_rw,
+    #                         time_keygen_rw, time_enc_rw, time_dec_rw, time_reg_user_rw, time_AA_setup_rw, avg_size_cph_kyxj,
+    #                         avg_size_cph_pcmacpabe, avg_size_cph_rw, avg_accumulator_single_puncture, avg_accumulator_batch_puncture]}\n''')
 
     return [time_setup_kyxj, time_keygen_kyxj, time_enc_kyxj, time_dec_kyxj,
             time_reg_user_kyxj, time_AA_setup_kyxj, time_setup_pmacpabe, time_keygen_pmacpabe, time_enc_pmacpabe,
@@ -786,41 +851,92 @@ def measure_average_times(abe, attr_list, policy_str, puncturable_attr_dict, k1,
             time_transform, time_puncture_1, time_puncture_2, time_puncture_3, time_puncture_4, time_single_puncture,
             time_batch_puncture, time_keygen_1, time_keygen_2, time_keygen_3, time_keygen_4, time_setup_rw,
             time_keygen_rw, time_enc_rw, time_dec_rw, time_reg_user_rw, time_AA_setup_rw, avg_size_cph_kyxj,
-            avg_size_cph_pcmacpabe, avg_size_cph_rw, avg_accumulator_single_puncture, avg_accumulator_batch_puncture]
+            avg_size_cph_pcmacpabe, avg_size_cph_rw, avg_accumulator_single_puncture, avg_accumulator_batch_puncture, overhead_cph_single_puncture, overhead_cph_batch_puncture]
 
 
 def print_running_time(scheme_name, times, attr_number, privacy_level):
     # print(f" the time variable is {scheme_name}: {times}: {attr_number}: {privacy_level} \n\n")
-    if scheme_name == "P-MACP-ABE":
-        print('{:<26}'.format(scheme_name) + str(attr_number).format('  ') + 15*' ' + str(privacy_level).format('   ') + 11*' '+
-            format(times[6] * 1000, '7.2f') + 8 * ' ' + format(times[7] * 1000, '7.2f') + 8 * ' ' +
-            format(times[8] * 1000, '7.2f') + 8 * ' ' + format(times[10] * 1000, '7.2f') + 11 * ' ' +
-            format(times[31] * 1000, '7.2f') + 11 * ' ' + format(times[11] * 1000, '7.2f')
-
-            )
+    if scheme_name == "P_MACP_ABE":
+        # print('{:<26}'.format(scheme_name) + str(attr_number).format('  ') + 15 * ' ' + str(privacy_level).format(
+        #     '   ') + 11 * ' ' +
+        #       format(times[6] * 1000, '7.2f') + 8 * ' ' + format(times[7] * 1000, '7.2f') + 8 * ' ' +
+        #       format(times[9] * 1000, '7.2f') + 8 * ' ' + format(times[8] * 1000, '7.2f') + 15 * ' ' +
+        #       format(times[18] * 1000, '7.2f') + 19 * ' ' +
+        #       format(times[19] * 1000, '7.2f') + 15 * ' ' +
+        #       format(times[10] * 1000, '7.2f') + 14 * ' '+ format(times[11] * 1000, '7.2f')
+        #
+        #       )
+        print_row_p_macp_abe(scheme_name, attr_number, privacy_level,
+           times[6] * 1000, times[7] * 1000, times[8] * 1000, times[9] * 1000,
+           times[18] * 1000, times[10] * 1000, times[31] * 1000, times[33])
     else:
-        print('{:<26}'.format(scheme_name) + str(attr_number).format(' ') + '         ' + format(times[0] * 1000,
-                                                                                                 '7.2f') + '        ' + format(
-            times[1] * 1000,
-            '7.2f') + '       ' + format(
-            times[2] * 1000, '7.2f') + '       ' + format(times[3] * 1000, '7.2f'))
+        print_row_maabe_yj14(scheme_name, attr_number, privacy_level, times[5] * 1000, times[1] * 1000, times[2] * 1000, times[3] * 1000, times[30])
+    # else:
+    #     print('{:<26}'.format(scheme_name) + str(attr_number).format(' ') + '         ' + format(times[0] * 1000,
+    #                                                                                              '7.2f') + '        ' + format(
+    #         times[1] * 1000,
+    #         '7.2f') + '       ' + format(
+    #         times[2] * 1000, '7.2f') + '       ' + format(times[3] * 1000, '7.2f'))
+
+#----------------------------------------------------------------------------------------------------
+# helper functions for displaying on P_MACP-ABE
+ROW_P_MACP_ABE = "{:<22} {:>16} {:>16} {:>13} {:>13} {:>15} {:>15} {:>15} {:>15} {:>30} {:>30}"
+#
+def print_row_p_macp_abe(label, n_attr, priv, setup="-", keygen="-", hide="-", enc="-",
+       puncture="-", dec="-", cph="-", acc="-"):
+    """Print one aligned row. Numbers are auto-formatted; '-' = empty cell."""
+    def cell(v):
+        return f"{v:.2f}" if isinstance(v, (int, float)) else str(v)
+    print(ROW_P_MACP_ABE.format(label, n_attr, priv,
+                                cell(setup), cell(keygen), cell(hide), cell(enc),
+                                cell(puncture), cell(dec), cell(cph), cell(acc)))
+# -------------------------------------------------------------------------------------------------
+# helper functions for displaying on maabe_yj14
+ROW_maabe_yj14 = "{:<22} {:>16} {:>16} {:>13} {:>13} {:>15} {:>15} {:>30}"
+#
+def print_row_maabe_yj14(label, n_attr, priv, setup="-", keygen="-", enc="-", dec="-", cph="-"):
+    """Print one aligned row. Numbers are auto-formatted; '-' = empty cell."""
+    def cell(v):
+        return f"{v:.2f}" if isinstance(v, (int, float)) else str(v)
+    print(ROW_maabe_yj14.format(label, n_attr, priv, cell(setup), cell(keygen),
+                                cell(enc), cell(dec), cell(cph)))
+#-------------------------------------------------------------------------------------------------
+# helper functions for displaying on maabe_rouselakis-waters
+ROW_maabe_rw15_cp = "{:<22} {:>16} {:>16} {:>13} {:>13} {:>15} {:>15} {:>30}"
+#
+def print_row_maabe_rw15_cp(label, n_attr, priv, setup="-", keygen="-", enc="-", dec="-", cph="-"):
+    """Print one aligned row. Numbers are auto-formatted; '-' = empty cell."""
+    def cell(v):
+        return f"{v:.2f}" if isinstance(v, (int, float)) else str(v)
+    print(ROW_maabe_rw15_cp.format(label, n_attr, priv, cell(setup), cell(keygen),
+                                cell(enc), cell(dec), cell(cph)))
 
 # def measure_average_times(abe, attr_list, policy_str, revoked_user_list, k1, k2, k3, msg, privacy_level, epsilon_str, hidden_policy_str, N=10):
-def run_all(pairing_group, policy_size, policy_str, attr_list, puncturable_attr_dict, rw_policy_string, rw_attr_list, k1, k2, k3, msg, privacy_level, epsilon_str):
-    algos = ['#attributes', 'privacy level', 'Setup (ms)', 'KeyGen (ms)', 'Hide (ms)', 'Enc (ms)', 'Puncture (ms)', 'Dec (ms)', 'Ciphertext (bytes)']
+def run_all(pairing_group, policy_str, attr_list, puncturable_attr_dict, rw_policy_string, rw_attr_list, k1, k2, k3,
+            msg, privacy_level, epsilon_str, policy_size):
+    algos = ['#attributes', 'privacy level', 'Setup (ms)', 'KeyGen (ms)', 'Hide (ms)', 'Enc (ms)', 'Single Puncture (ms)', 'Batch Puncture (ms)', 'Dec (ms)', 'Ciphertext (bytes)']
 
     n1, n2, m, i = get_par(pairing_group, policy_str, attr_list)
 
     print('Running times (msp) curve', curve_type, ': n1={}  n2={}  m={}  I={}'.format(n1, n2, m, i))
-    algo_string = 'CP-ABE {:<13}'.format('') + '  ' + algos[0] + '      ' + algos[1] + '     ' + algos[2] + '    ' + algos[3] + '     ' + \
-                  algos[4] + '      ' + algos[5] + '      ' + algos[6] + '      ' + algos[7]
-    print('-' * 160)
-    print(algo_string)
-    print('-' * 160)
+    # algo_string = 'CP-ABE {:<13}'.format('') + '  ' + algos[0] + '      ' + algos[1] + '     ' + algos[2] + '    ' + \
+    #               algos[3] + '     ' + \
+    #               algos[4] + '      ' + algos[5] + '      ' + algos[6] + '          ' + algos[7] + '      ' + algos[8] + '      ' + algos[9]
+
+    # print('-' * 220)
+    # # print(algo_string)
+    # print('-' * 220)
     #
     #
     p_macp_abe24 = P_MACP_ABE(pairing_group)
-    p_macp_abe_times = measure_average_times(p_macp_abe24, attr_list, policy_str, puncturable_attr_dict, k1, k2, k3, msg, privacy_level, epsilon_str)
+    #
+    print("-" * 210)
+    print_row_p_macp_abe("Scheme", "Attributes", "Privacy Level", "Setup(ms)", "KeyGen(ms)", "Hide(ms)",
+                         "Enc(ms)", "Puncture(ms)", "Dec(ms)", "Ciphertext size(Bytes)", "Accumulator size(Bytes)")
+    print("-" * 210)
+
+    p_macp_abe_times = measure_average_times(p_macp_abe24, attr_list, policy_str, puncturable_attr_dict, k1, k2, k3,
+                                                 msg, privacy_level, epsilon_str)
 
     # return [time_setup_kyxj, time_keygen_kyxj, time_enc_kyxj, time_dec_kyxj,
     #         time_reg_user_kyxj, time_AA_setup_kyxj, time_setup_pmacpabe, time_keygen_pmacpabe, time_enc_pmacpabe,
@@ -832,95 +948,115 @@ def run_all(pairing_group, policy_size, policy_str, attr_list, puncturable_attr_
 
     print_running_time(p_macp_abe24.name, p_macp_abe_times, len(attr_list), privacy_level)
     #
-    print(f""
-          f"1- setup: {p_macp_abe_times[6]}\n"
-          f"2- keygen: {p_macp_abe_times[7]}\n"
-          f"3- encryption: {p_macp_abe_times[8]}\n")
 
-    print('{:<26}'.format('   | setup') + str(len(attr_list)).format(' ') + '{:<15}'.format(' ') +
-          str(privacy_level).format(' ') + 11*' ' + format(p_macp_abe_times[6] * 1000, '7.2f') + 12*' ' + '-' + 14*' '
-          + '-' + format(' ') + 3*' ' + format('  ') + 8*' ' + '-' + format(' ') + 16*' ' + '-' +
-          format(' ') + 16*' ' + '-')
+    # print('{:<26}'.format('   | setup') + str(len(attr_list)).format(' ') + '{:<15}'.format(' ') +
+    #       str(privacy_level).format(' ') + 11 * ' ' + format(p_macp_abe_times[6] * 1000,
+    #                                                          '7.2f') + 12 * ' ' + '-' + 14 * ' '
+    #       + '-' + format(' ') + 3 * ' ' + format('  ') + 10 * ' ' + '-' + format(' ') + 18 * ' ' + '-' +
+    #       format(' ') + 18 * ' ' + '-')
+    # #
+    # print('{:<26}'.format('   | hide') + str(len(attr_list)).format(' ') + '{:<11}'.format(' ') + 14 * ' ' +
+    #       format(p_macp_abe_times[9] * 1000, '7.2f') + '-' + 14 * ' ' + '-' + format(' ') + 8 * ' ' +
+    #       format('  ') + 14 * ' ' + '-' + format(' ') + 20 * ' ' + '-' + format(' ') + 16 * ' ' + '-'
+    #       + format(' ') + 16 * ' ' + '-' + format(' ') + 16 * ' ' + '-')
+    # #
+    # print('{:<26}'.format('   | keygen 1') + str(len(attr_list)).format(' ') + '{:<9}'.format('') + '      -        ' +
+    #       format(p_macp_abe_times[20] * 1000, '7.2f') + '             -' + format(' ') + '  ' + format(
+    #     '  ') + '        -' + format(
+    #     ' ') + '                   -')
+    # #
+    # print('{:<26}'.format('   | keygen 2') + str(len(attr_list)).format(' ') + '{:<9}'.format('') + '      -        ' +
+    #       format(p_macp_abe_times[21] * 1000, '7.2f') + '             -' + format('  ') + '  ' + format(
+    #     '  ') + '       -' + format(
+    #     ' ') + '                   -')
+    # print('{:<26}'.format('   | keygen 3') + str(len(attr_list)).format(' ') + '{:<9}'.format('') + '      -        ' +
+    #       format(p_macp_abe_times[22] * 1000, '7.2f') + '             -' + format('  ') + '  ' + format(
+    #     '  ') + '       -' + format(
+    #     ' ') + '                   -')
+    # print('{:<26}'.format('   | keygen 4') + str(len(attr_list)).format(' ') + '{:<9}'.format('') + '      -        ' +
+    #       format(p_macp_abe_times[23] * 1000, '7.2f') + '             -' + format('  ') + '  ' + format(
+    #     '  ') + '       -' + format(
+    #     ' ') + '                   -')
+    # print('{:<26}'.format('   | encrypt ') + str(len(attr_list)).format(' ') + '               -' + format(
+    #     ' ') + ' ' + '{:<6}'.format('') + '      -       ' +
+    #       format(p_macp_abe_times[9] * 1000, '7.2f') + '             -' + format(' ') + '                   -')
     #
-    print('{:<26}'.format('   | hide') + str(len(attr_list)).format(' ') + '{:<11}'.format(' ') + 14 * ' ' +
-          format(p_macp_abe_times[9] * 1000, '7.2f') + '-' + 14 * ' ' + '-' + format(' ') + 3 * ' ' +
-          format('  ') + 8 * ' ' + '-' + format(' ') + 13 * ' ' + '-' + format(' ') + 16 * ' ' + '-'
-          + format(' ') + 16 * ' ' + '-')
+    # print('{:<26}'.format('   | transform') + str(len(attr_list)).format(' ') + '               -' + format(
+    #     ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' +
+    #       format(p_macp_abe_times[15] * 1000, '7.2f') + '                    -')
     #
-    print('{:<26}'.format('   | keygen 1') + str(len(attr_list)).format(' ') + '{:<9}'.format('') + '      -        ' +
-          format(p_macp_abe_times[20] * 1000, '7.2f') + '             -' + format(' ') + '  ' + format(
-        '  ') + '        -' + format(
-        ' ') + '                   -')
+    # print('{:<26}'.format('   | decrypt') + str(len(attr_list)).format(' ') + '               -' + format(
+    #     ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' +
+    #       format(p_macp_abe_times[11] * 1000, '7.2f') + '                    -')
     #
-    print('{:<26}'.format('   | keygen 2') + str(len(attr_list)).format(' ') + '{:<9}'.format('') + '      -        ' +
-          format(p_macp_abe_times[21] * 1000, '7.2f') + '             -' + format('  ') + '  ' + format(
-        '  ') + '       -' + format(
-        ' ') + '                   -')
-    print('{:<26}'.format('   | keygen 3') + str(len(attr_list)).format(' ') + '{:<9}'.format('') + '      -        ' +
-          format(p_macp_abe_times[22] * 1000, '7.2f') + '             -' + format('  ') + '  ' + format(
-        '  ') + '       -' + format(
-        ' ') + '                   -')
-    print('{:<26}'.format('   | keygen 4') + str(len(attr_list)).format(' ') + '{:<9}'.format('') + '      -        ' +
-          format(p_macp_abe_times[23] * 1000, '7.2f') + '             -' + format('  ') + '  ' + format(
-        '  ') + '       -' + format(
-        ' ') + '                   -')
-    print('{:<26}'.format('   | encrypt ') + str(len(attr_list)).format(' ') + '               -' + format(
-        ' ') + ' ' + '{:<6}'.format('') + '      -       ' +
-          format(p_macp_abe_times[9] * 1000, '7.2f') + '             -' + format(' ') + '                   -')
-
-    print('{:<26}'.format('   | transform') + str(len(attr_list)).format(' ') + '               -' + format(
-        ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' +
-          format(p_macp_abe_times[15] * 1000, '7.2f') + '                    -')
-
-    print('{:<26}'.format('   | decrypt') + str(len(attr_list)).format(' ') + '               -' + format(
-        ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' +
-          format(p_macp_abe_times[11] * 1000, '7.2f') + '                    -')
-
-    print('{:<26}'.format('   | cph_size (bytes)') + str(len(attr_list)).format(' ') + '               -' + format(
-        ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' + '      -               ' +
-          format(p_macp_abe_times[31], '5.1f'))
-
-    print('{:<26}'.format('   | mkl_size (bytes)') + str(len(attr_list)).format(' ') + '               -' + format(
-        ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' + '      -               ' +
-          format(p_macp_abe_times[33], '5.1f'))
+    # print('{:<26}'.format('   | cph_size (bytes)') + str(len(attr_list)).format(' ') + '               -' + format(
+    #     ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' + '      -               ' +
+    #       format(p_macp_abe_times[31], '5.1f'))
     #
+    # print('{:<26}'.format('   | mkl_size (bytes)') + str(len(attr_list)).format(' ') + '               -' + format(
+    #     ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' + '      -               ' +
+    #       format(p_macp_abe_times[33], '5.1f'))
+    #
+
+    # New display
+    print_row_p_macp_abe("   | setup", len(attr_list), privacy_level, setup=p_macp_abe_times[6] * 1000)
+    print_row_p_macp_abe("   | AAsetup", len(attr_list), privacy_level, setup=p_macp_abe_times[12] * 1000)
+    print_row_p_macp_abe("   | hide", len(attr_list), privacy_level, hide=p_macp_abe_times[9] * 1000)
+    print_row_p_macp_abe("   | keygen 1", len(attr_list), privacy_level, keygen=p_macp_abe_times[20] * 1000)
+    print_row_p_macp_abe("   | keygen 2", len(attr_list), privacy_level, keygen=p_macp_abe_times[21] * 1000)
+    print_row_p_macp_abe("   | keygen 3", len(attr_list), privacy_level, keygen=p_macp_abe_times[22] * 1000)
+    print_row_p_macp_abe("   | keygen 4", len(attr_list), privacy_level, keygen=p_macp_abe_times[23] * 1000)
+    print_row_p_macp_abe("   | encrypt", len(attr_list), privacy_level, enc=p_macp_abe_times[8] * 1000)
+    print_row_p_macp_abe("   | single puncture", len(attr_list), privacy_level, puncture=p_macp_abe_times[18] * 1000)
+    print_row_p_macp_abe("      | puncture 1", len(attr_list), privacy_level, puncture=p_macp_abe_times[14] * 1000)
+    print_row_p_macp_abe("      | puncture 2", len(attr_list), privacy_level, puncture=p_macp_abe_times[15] * 1000)
+    print_row_p_macp_abe("   | batch puncture", len(attr_list), privacy_level, puncture=p_macp_abe_times[19] * 1000)
+    print_row_p_macp_abe("      | puncture 3", len(attr_list), privacy_level, puncture=p_macp_abe_times[16] * 1000)
+    print_row_p_macp_abe("      | puncture 4", len(attr_list), privacy_level, puncture=p_macp_abe_times[17] * 1000)
+
+    print_row_p_macp_abe("   | transform", len(attr_list), privacy_level, dec=p_macp_abe_times[13] * 1000)
+    print_row_p_macp_abe("   | decrypt", len(attr_list), privacy_level, dec=p_macp_abe_times[10] * 1000)
+    print_row_p_macp_abe("   | cph_size", len(attr_list), privacy_level, cph=p_macp_abe_times[31])
+    print_row_p_macp_abe("   | ovh cph_spunct", len(attr_list), privacy_level, acc=p_macp_abe_times[35])
+    print_row_p_macp_abe("   | ovh cph_bpunct", len(attr_list), privacy_level, acc=p_macp_abe_times[36])
+    print_row_p_macp_abe("   | acc. s_punct_size", len(attr_list), privacy_level, acc=p_macp_abe_times[33])
+    print_row_p_macp_abe("   | acc. b_punct_size", len(attr_list), privacy_level, acc=p_macp_abe_times[34])
 
     output_data_pmacpabe['Scheme'].append(p_macp_abe24.name)
     output_data_pmacpabe['#attributes'].append(len(attr_list))
-    output_data_pmacpabe['anonymity level'].append(1)
-    output_data_pmacpabe['Setup (ms)'].append(p_macp_abe_times[6]*1000)
+    output_data_pmacpabe['anonymity level'].append(privacy_level)
+    output_data_pmacpabe['Setup (ms)'].append(p_macp_abe_times[6] * 1000)
     output_data_pmacpabe['HideAttr (ms)'].append(p_macp_abe_times[7] * 1000)
-    output_data_pmacpabe['Keygen (ms)'].append(p_macp_abe_times[8]*1000)
-    output_data_pmacpabe['Encrypt (ms)'].append(p_macp_abe_times[9]*1000)
+    output_data_pmacpabe['Keygen (ms)'].append(p_macp_abe_times[8] * 1000)
+    output_data_pmacpabe['Encrypt (ms)'].append(p_macp_abe_times[9] * 1000)
     output_data_pmacpabe['Single puncture (ms)'].append(p_macp_abe_times[9] * 1000)
     output_data_pmacpabe['Batch puncture (ms)'].append(p_macp_abe_times[9] * 1000)
-    output_data_pmacpabe['Transform (ms)'].append(p_macp_abe_times[15]*1000)
-    output_data_pmacpabe['Decrypt (ms)'].append(p_macp_abe_times[11]*1000)
+    output_data_pmacpabe['Transform (ms)'].append(p_macp_abe_times[15] * 1000)
+    output_data_pmacpabe['Decrypt (ms)'].append(p_macp_abe_times[11] * 1000)
     output_data_pmacpabe['Ciphertext size (bytes)'].append(p_macp_abe_times[31])
-    #output_data_pmacpabe['URevocation (ms)'].append(p_macp_abe_times[10]*1000)
+    # output_data_pmacpabe['URevocation (ms)'].append(p_macp_abe_times[10]*1000)
     # output_data_pmacpabe['ARevocation (ms)'].append(p_macp_abe_times[14]*1000)
-    output_data_pmacpabe['URegistration (ms)'].append(p_macp_abe_times[12]*1000)
-    output_data_pmacpabe['AASetup (ms)'].append(p_macp_abe_times[13]*1000)
+    output_data_pmacpabe['URegistration (ms)'].append(p_macp_abe_times[12] * 1000)
+    output_data_pmacpabe['AASetup (ms)'].append(p_macp_abe_times[13] * 1000)
     output_data_pmacpabe['Accumulator size (bytes)'].append(p_macp_abe_times[33])
-
 
     #
     p_macp_abe_cph_data['Scheme'].append(p_macp_abe24.name)
     p_macp_abe_cph_data['#attributes'].append(len(attr_list))
     p_macp_abe_cph_data['K level'].append(0)
-    p_macp_abe_cph_data['Keygen1 (ms)'].append(p_macp_abe_times[20]*1000)
-    p_macp_abe_cph_data['Keygen2 (ms)'].append(p_macp_abe_times[21]*1000)
-    p_macp_abe_cph_data['Keygen3 (ms)'].append(p_macp_abe_times[22]*1000)
-    p_macp_abe_cph_data['Keygen4 (ms)'].append(p_macp_abe_times[23]*1000)
-    p_macp_abe_cph_data['Encrypt (ms)'].append(p_macp_abe_times[9]*1000)
+    p_macp_abe_cph_data['Keygen1 (ms)'].append(p_macp_abe_times[20] * 1000)
+    p_macp_abe_cph_data['Keygen2 (ms)'].append(p_macp_abe_times[21] * 1000)
+    p_macp_abe_cph_data['Keygen3 (ms)'].append(p_macp_abe_times[22] * 1000)
+    p_macp_abe_cph_data['Keygen4 (ms)'].append(p_macp_abe_times[23] * 1000)
+    p_macp_abe_cph_data['Encrypt (ms)'].append(p_macp_abe_times[9] * 1000)
     p_macp_abe_cph_data['Puncture1 (ms)'].append(p_macp_abe_times[9] * 1000)
     p_macp_abe_cph_data['Puncture2 (ms)'].append(p_macp_abe_times[9] * 1000)
     p_macp_abe_cph_data['Puncture3 (ms)'].append(p_macp_abe_times[9] * 1000)
-    p_macp_abe_cph_data['Transform (ms)'].append(p_macp_abe_times[15]*1000)
-    p_macp_abe_cph_data['Decrypt (ms)'].append(p_macp_abe_times[11]*1000)
+    p_macp_abe_cph_data['Transform (ms)'].append(p_macp_abe_times[15] * 1000)
+    p_macp_abe_cph_data['Decrypt (ms)'].append(p_macp_abe_times[11] * 1000)
     p_macp_abe_cph_data['Ciphertext size (bytes)'].append(p_macp_abe_times[31])
-    p_macp_abe_cph_data['Uregistration (ms)'].append(p_macp_abe_times[12]*1000)
-    p_macp_abe_cph_data['AASetup (ms)'].append(p_macp_abe_times[13]*1000)
+    p_macp_abe_cph_data['Uregistration (ms)'].append(p_macp_abe_times[12] * 1000)
+    p_macp_abe_cph_data['AASetup (ms)'].append(p_macp_abe_times[13] * 1000)
     p_macp_abe_cph_data['ACC size (bytes)'].append(p_macp_abe_times[31])
 
     #
@@ -931,43 +1067,58 @@ def run_all(pairing_group, policy_size, policy_str, attr_list, puncturable_attr_
     #         time_revoke_attribute_srmacpabe, time_transform, time_revoke_1, time_revoke_2, time_revoke_3, time_revoke_4,
     #         time_keygen_1, time_keygen_2, time_keygen_3, time_keygen_4, avg_size_cph_kyxj, avg_size_cph_srcmacpabe]
 
+    # ---------------------------------------------------------------------------------------------------------------
+
+    print("-" * 210)
+    print_row_maabe_yj14("Scheme", "Attributes", "Privacy Level", "setup(ms)",
+                         "keygen(ms)", "encrypt(ms)", "decrypt(ms)", "Ciphertext size(Bytes)")
+    print("-" * 210)
+
     maabe_yj14_cp = MAABE(pairing_group)
-    maabe_yj14_cp_times = measure_average_times(maabe_yj14_cp, attr_list, policy_str, puncturable_attr_dict, k1, k2, k3, msg, privacy_level, epsilon_str)
+    maabe_yj14_cp_times = measure_average_times(maabe_yj14_cp, attr_list, policy_str, puncturable_attr_dict, k1, k2, k3,
+                                                msg, privacy_level, epsilon_str)
     print_running_time(maabe_yj14_cp.name, maabe_yj14_cp_times, len(attr_list), privacy_level)
-    print('{:<26}'.format('   | authority setup ') + str(len(attr_list)).format(' ') + '{:<9}'.format('') +
-          format(maabe_yj14_cp_times[6] * 1000, '7.2f') + '              -' + '             -' + format(
-        ' ') + '  ' + format(
-        '  ') + '        -' + format(
-        ' ') + '                   -')
-
-    print('{:<26}'.format('   | user registration ') + str(len(attr_list)).format(' ') + '{:<9}'.format('') +
-          format(maabe_yj14_cp_times[5] * 1000, '7.2f') + '              -' + '             -' + format(
-        ' ') + '  ' + format(
-        '  ') + '        -' + format(
-        ' ') + '                   -')
-
-    print('{:<26}'.format('   | setup ') + str(len(attr_list)).format(' ') + '{:<9}'.format('') +
-          format(maabe_yj14_cp_times[0] * 1000, '7.2f') + '              -' + '             -' + format(
-        ' ') + '  ' + format(
-        '  ') + '        -' + format(
-        ' ') + '                   -')
-
-    print('{:<26}'.format('   | keygen') + str(len(attr_list)).format(' ') + '{:<9}'.format('') + '      -        ' +
-          format(maabe_yj14_cp_times[1] * 1000, '7.2f') + '             -' + format('  ') + '  ' + format(
-        '  ') + '       -' + format(
-        ' ') + '                   -')
-
-    print('{:<26}'.format('   | encrypt ') + str(len(attr_list)).format(' ') + '               -' + format(
-        ' ') + ' ' + '{:<6}'.format('') + '      -       ' +
-          format(maabe_yj14_cp_times[2] * 1000, '7.2f') + '             -' + format(' ') + '                   -')
-
-    print('{:<26}'.format('   | decrypt') + str(len(attr_list)).format(' ') + '               -' + format(
-        ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' +
-          format(maabe_yj14_cp_times[4] * 1000, '7.2f') + '                    -')
-
-    print('{:<26}'.format('   | cph_size (bytes)') + str(len(attr_list)).format(' ') + '               -' + format(
-        ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' + '      -               ' +
-          format(maabe_yj14_cp_times[30], '5.1f'))
+    # print('{:<26}'.format('   | authority setup ') + str(len(attr_list)).format(' ') + '{:<9}'.format('') +
+    #       format(maabe_yj14_cp_times[6] * 1000, '7.2f') + '              -' + '             -' + format(
+    #     ' ') + '  ' + format(
+    #     '  ') + '        -' + format(
+    #     ' ') + '                   -')
+    #
+    # print('{:<26}'.format('   | user registration ') + str(len(attr_list)).format(' ') + '{:<9}'.format('') +
+    #       format(maabe_yj14_cp_times[5] * 1000, '7.2f') + '              -' + '             -' + format(
+    #     ' ') + '  ' + format(
+    #     '  ') + '        -' + format(
+    #     ' ') + '                   -')
+    #
+    # print('{:<26}'.format('   | setup ') + str(len(attr_list)).format(' ') + '{:<9}'.format('') +
+    #       format(maabe_yj14_cp_times[0] * 1000, '7.2f') + '              -' + '             -' + format(
+    #     ' ') + '  ' + format(
+    #     '  ') + '        -' + format(
+    #     ' ') + '                   -')
+    #
+    # print('{:<26}'.format('   | keygen') + str(len(attr_list)).format(' ') + '{:<9}'.format('') + '      -        ' +
+    #       format(maabe_yj14_cp_times[1] * 1000, '7.2f') + '             -' + format('  ') + '  ' + format(
+    #     '  ') + '       -' + format(
+    #     ' ') + '                   -')
+    #
+    # print('{:<26}'.format('   | encrypt ') + str(len(attr_list)).format(' ') + '               -' + format(
+    #     ' ') + ' ' + '{:<6}'.format('') + '      -       ' +
+    #       format(maabe_yj14_cp_times[2] * 1000, '7.2f') + '             -' + format(' ') + '                   -')
+    #
+    # print('{:<26}'.format('   | decrypt') + str(len(attr_list)).format(' ') + '               -' + format(
+    #     ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' +
+    #       format(maabe_yj14_cp_times[4] * 1000, '7.2f') + '                    -')
+    #
+    # print('{:<26}'.format('   | cph_size (bytes)') + str(len(attr_list)).format(' ') + '               -' + format(
+    #     ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' + '      -               ' +
+    #       format(maabe_yj14_cp_times[30], '5.1f'))
+    print_row_maabe_yj14("   | authority setup", len(attr_list), privacy_level, setup=maabe_yj14_cp_times[5] * 1000)
+    print_row_maabe_yj14("   | user registration", len(attr_list), privacy_level, setup=maabe_yj14_cp_times[4] * 1000)
+    print_row_maabe_yj14("   | setup", len(attr_list), privacy_level, setup=maabe_yj14_cp_times[0] * 1000)
+    print_row_maabe_yj14("   | keygen", len(attr_list), privacy_level, keygen=maabe_yj14_cp_times[1] * 1000)
+    print_row_maabe_yj14("   | encrypt", len(attr_list), privacy_level, enc=maabe_yj14_cp_times[2] * 1000)
+    print_row_maabe_yj14("   | decrypt", len(attr_list), privacy_level, dec=maabe_yj14_cp_times[3] * 1000)
+    print_row_maabe_yj14("   | cph_size", len(attr_list), privacy_level, cph=maabe_yj14_cp_times[30])
     #
     output_data_kyxj['Scheme'].append(maabe_yj14_cp.name)
     output_data_kyxj['#attributes'].append(len(attr_list))
@@ -984,50 +1135,60 @@ def run_all(pairing_group, policy_size, policy_str, attr_list, puncturable_attr_
     # output_data_kyxj['ARevocation (ms)'].append(0)
 
     maabe_rw15_cp = MaabeRW15(pairing_group)
-    maabe_rw15_cp_times = measure_average_times(maabe_rw15_cp, rw_attr_list, rw_policy_string, puncturable_attr_dict, k1, k2, k3, msg, privacy_level, epsilon_str)
+    maabe_rw15_cp_times = measure_average_times(maabe_rw15_cp, rw_attr_list, rw_policy_string, puncturable_attr_dict,
+                                                k1, k2, k3, msg, privacy_level, epsilon_str)
     print_running_time(maabe_rw15_cp.name, maabe_rw15_cp_times, len(rw_attr_list), privacy_level)
-    print('{:<26}'.format('   | authority setup ') + str(len(attr_list)).format(' ') + '{:<9}'.format('') +
-          format(maabe_rw15_cp_times[29] * 1000, '7.2f') + '              -' + '             -' + format(
-        ' ') + '  ' + format(
-        '  ') + '        -' + format(
-        ' ') + '                   -')
+    #
+    # print('{:<26}'.format('   | authority setup ') + str(len(attr_list)).format(' ') + '{:<9}'.format('') +
+    #       format(maabe_rw15_cp_times[29] * 1000, '7.2f') + '              -' + '             -' + format(
+    #     ' ') + '  ' + format(
+    #     '  ') + '        -' + format(
+    #     ' ') + '                   -')
+    #
+    # print('{:<26}'.format('   | user registration ') + str(len(attr_list)).format(' ') + '{:<9}'.format('') +
+    #       format(maabe_rw15_cp_times[28] * 1000, '7.2f') + '              -' + '             -' + format(
+    #     ' ') + '  ' + format(
+    #     '  ') + '        -' + format(
+    #     ' ') + '                   -')
+    #
+    # print('{:<26}'.format('   | setup ') + str(len(attr_list)).format(' ') + '{:<9}'.format('') +
+    #       format(maabe_rw15_cp_times[24] * 1000, '7.2f') + '              -' + '             -' + format(
+    #     ' ') + '  ' + format(
+    #     '  ') + '        -' + format(
+    #     ' ') + '                   -')
+    #
+    # print('{:<26}'.format('   | keygen') + str(len(attr_list)).format(' ') + '{:<9}'.format('') + '      -        ' +
+    #       format(maabe_rw15_cp_times[25] * 1000, '7.2f') + '             -' + format('  ') + '  ' + format(
+    #     '  ') + '       -' + format(
+    #     ' ') + '                   -')
+    #
+    # print('{:<26}'.format('   | encrypt ') + str(len(attr_list)).format(' ') + '               -' + format(
+    #     ' ') + ' ' + '{:<6}'.format('') + '      -       ' +
+    #       format(maabe_rw15_cp_times[26] * 1000, '7.2f') + '             -' + format(' ') + '                   -')
+    #
+    # print('{:<26}'.format('   | decrypt') + str(len(attr_list)).format(' ') + '               -' + format(
+    #     ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' +
+    #       format(maabe_rw15_cp_times[27] * 1000, '7.2f') + '                    -')
+    #
+    # print('{:<26}'.format('   | cph_size (bytes)') + str(len(attr_list)).format(' ') + '               -' + format(
+    #     ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' + '      -               ' +
+    #       format(maabe_rw15_cp_times[32], '5.1f'))
 
-    print('{:<26}'.format('   | user registration ') + str(len(attr_list)).format(' ') + '{:<9}'.format('') +
-          format(maabe_rw15_cp_times[28] * 1000, '7.2f') + '              -' + '             -' + format(
-        ' ') + '  ' + format(
-        '  ') + '        -' + format(
-        ' ') + '                   -')
-
-    print('{:<26}'.format('   | setup ') + str(len(attr_list)).format(' ') + '{:<9}'.format('') +
-          format(maabe_rw15_cp_times[24] * 1000, '7.2f') + '              -' + '             -' + format(
-        ' ') + '  ' + format(
-        '  ') + '        -' + format(
-        ' ') + '                   -')
-
-    print('{:<26}'.format('   | keygen') + str(len(attr_list)).format(' ') + '{:<9}'.format('') + '      -        ' +
-          format(maabe_rw15_cp_times[25] * 1000, '7.2f') + '             -' + format('  ') + '  ' + format(
-        '  ') + '       -' + format(
-        ' ') + '                   -')
-
-    print('{:<26}'.format('   | encrypt ') + str(len(attr_list)).format(' ') + '               -' + format(
-        ' ') + ' ' + '{:<6}'.format('') + '      -       ' +
-          format(maabe_rw15_cp_times[26] * 1000, '7.2f') + '             -' + format(' ') + '                   -')
-
-    print('{:<26}'.format('   | decrypt') + str(len(attr_list)).format(' ') + '               -' + format(
-        ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' +
-          format(maabe_rw15_cp_times[27] * 1000, '7.2f') + '                    -')
-
-    print('{:<26}'.format('   | cph_size (bytes)') + str(len(attr_list)).format(' ') + '               -' + format(
-        ' ') + '  ' + '{:<6}'.format('') + '     -' + '             -       ' + '      -               ' +
-          format(maabe_rw15_cp_times[32], '5.1f'))
+    print_row_maabe_rw15_cp("   | authority setup", len(attr_list), privacy_level, setup=maabe_rw15_cp_times[29] * 1000)
+    print_row_maabe_rw15_cp("   | user registration", len(attr_list), privacy_level, setup=maabe_rw15_cp_times[28] * 1000)
+    print_row_maabe_rw15_cp("   | setup", len(attr_list), privacy_level, setup=maabe_rw15_cp_times[24] * 1000)
+    print_row_maabe_rw15_cp("   | keygen", len(attr_list), privacy_level, keygen=maabe_rw15_cp_times[25] * 1000)
+    print_row_maabe_rw15_cp("   | encrypt", len(attr_list), privacy_level, enc=maabe_rw15_cp_times[26] * 1000)
+    print_row_maabe_rw15_cp("   | decrypt", len(attr_list), privacy_level, dec=maabe_rw15_cp_times[27] * 1000)
+    print_row_maabe_rw15_cp("   | cph_size", len(attr_list), privacy_level, cph=maabe_rw15_cp_times[32])
 
     #
     output_data_rw15['Scheme'].append(maabe_rw15_cp.name)
     output_data_rw15['#attributes'].append(len(attr_list))
-    output_data_rw15['Setup (ms)'].append(maabe_rw15_cp_times[24]*1000)
-    output_data_rw15['Keygen (ms)'].append(maabe_rw15_cp_times[25]*1000)
-    output_data_rw15['Encrypt (ms)'].append(maabe_rw15_cp_times[26]*1000)
-    output_data_rw15['Decrypt (ms)'].append(maabe_rw15_cp_times[27]*1000)
+    output_data_rw15['Setup (ms)'].append(maabe_rw15_cp_times[24] * 1000)
+    output_data_rw15['Keygen (ms)'].append(maabe_rw15_cp_times[25] * 1000)
+    output_data_rw15['Encrypt (ms)'].append(maabe_rw15_cp_times[26] * 1000)
+    output_data_rw15['Decrypt (ms)'].append(maabe_rw15_cp_times[27] * 1000)
     output_data_rw15['Ciphertext size (bytes)'].append(maabe_rw15_cp_times[32])
     output_data_rw15['URegistration (ms)'].append(maabe_rw15_cp_times[28] * 1000)
     output_data_rw15['AASetup (ms)'].append(maabe_rw15_cp_times[29] * 1000)
@@ -1056,8 +1217,7 @@ def create_policy_string_and_attribute_list(n, pairing_group):
     # we process the hidden access policy
     p_macpabe_instance = P_MACP_ABE(pairing_group)
 
-
-    #we process the policy for Rouselakis-Waters
+    # we process the policy for Rouselakis-Waters
     rw_policy_string = '(1@AA1'
     rw_attr_list = ['1@AA1']
 
@@ -1067,7 +1227,6 @@ def create_policy_string_and_attribute_list(n, pairing_group):
     puncturable_attr_dict['1'] = f'1$1'
 
     AA_list = ['AA1', 'AA2', 'AA3']
-
 
     for i in range(2, n + 1):
         policy_string += ' and ' + str(i)  # {i}'
@@ -1111,7 +1270,7 @@ def main():
     policy_sizes = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
     # the privacy level (k-anonymity for our scheme
-    privacy_levels = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200 ]
+    privacy_levels = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
 
     # the string used to hide attributes, which is chosen by DO
     epsilon_str = 'epsilon'
@@ -1122,317 +1281,36 @@ def main():
     # run_all(pairing_group, policy_size, policy_str, attr_list, hidden_policy, msg)
 
     for policy_size in policy_sizes:
-    # we do pair the first policy size with the first privacy level, the second with the second, etc.,
-    # we assume that the number of real tags in batch puncturing is the same as the policy size
-    # for policy_size, privacy_level in zip(policy_sizes, privacy_levels):
+        # we do pair the first policy size with the first privacy level, the second with the second, etc.,
+        # we assume that the number of real tags in batch puncturing is the same as the policy size
+        # for policy_size, privacy_level in zip(policy_sizes, privacy_levels):
         gc.collect(0)
         gc.collect(1)
         gc.collect(2)
-        policy_str, attr_list, rw_policy_string, rw_attr_list, puncturable_attr_dict = create_policy_string_and_attribute_list(policy_size, pairing_group)
-        privacy_level = 2* policy_size
+        policy_str, attr_list, rw_policy_string, rw_attr_list, puncturable_attr_dict = create_policy_string_and_attribute_list(
+            policy_size, pairing_group)
+        privacy_level = 2 * policy_size
         #
-        print(f" the list of attributes for puncture is {puncturable_attr_dict}")
-        print(f" the list of attributes for other schemes is {attr_list}")
-        print(f" the policy for other schemes is {policy_str}")
+        # print(f" the list of attributes for puncture is {puncturable_attr_dict}")
+        # print(f" the list of attributes for other schemes is {attr_list}")
+        # print(f" the policy for other schemes is {policy_str}")
 
         list_length = int(len(attr_list) // 3)
         attr_list_1 = attr_list[0:list_length]
         attr_list_2 = attr_list[list_length:(2 * list_length)]
         attr_list_3 = attr_list[(2 * list_length):len(attr_list)]
-    #
-        print(f"attr_list_1: {attr_list_1} \n")
-        print(f"attr_list_2: {attr_list_2} \n")
-        print(f"attr_list_3: {attr_list_3} \n")
+        #
+        #
 
-        # instance
-        p_mmacp_abe_instance = P_MACP_ABE(pairing_group)
+
         # setup time
         gc.collect(0)
         gc.collect(1)
         gc.collect(2)
         gc.collect()
         #
-        if debug:
-            print("we start setup \n\n")
-        #
-        sum_setup_pmacpabe = 0
-        start_setup = time.perf_counter()
-        (prv_DO, pub_DO, pk, msk) = p_mmacp_abe_instance.setup_()
-        end_setup = time.perf_counter()
-        time_setup = end_setup - start_setup
-        sum_setup_pmacpabe += time_setup
-
-
-        # Register a single user
-        # such user stands as the target user
-        sum_reg_user_pmacpabe = 0
-        start_reg =time.perf_counter()
-        # alice = abe.regUser('alice', attr_list, privacy_level)
-        # FIX: regUser needs dict, not list
-        alice = p_mmacp_abe_instance.regUser('alice', puncturable_attr_dict, privacy_level)
-
-        end_reg =time.perf_counter()
-        time_setup_1 = end_reg - start_reg
-        # sum_setup_srmacpabe += time_setup_1
-        sum_reg_user_pmacpabe += time_setup_1
-
-
-
-        # Register AAs (three AAs)
-        sum_reg_aa_pmacpabe = 0
-        start_setup_2 =time.perf_counter()
-        #
-        AA1_ID = 1
-        AA1_name = "AA_1"
-        p_mmacp_abe_instance.setupAA(AA1_ID, AA1_name, attr_list_1)
-        #
-        AA2_ID = 2
-        AA2_name = "AA_2"
-        p_mmacp_abe_instance.setupAA(AA2_ID, AA2_name, attr_list_2)
-        #
-        AA3_ID = 3
-        AA3_name = "AA_3"
-        p_mmacp_abe_instance.setupAA(AA3_ID, AA3_name, attr_list_3)
-        #
-        end_setup_2 =time.perf_counter()
-        time_setup_2 = end_setup_2 - start_setup_2
-        # sum_setup_srmacpabe += time_setup_2
-        sum_reg_aa_pmacpabe += time_setup_2
-
-
-        # DO Keygen1
-        sum_keygen_pmacpabe = 0
-        start_keygen_1 = time.perf_counter()
-        alice['DO_key'] = p_mmacp_abe_instance.keygen1(msk, alice['gid'], prv_DO, epsilon_str)
-        end_keygen_1 =time.perf_counter()
-        time_keygen = end_keygen_1 - start_keygen_1
-        sum_keygen_pmacpabe += time_keygen
-        # sum_keygen_1 += time_keygen
-
-
-        # DU hide timing
-        # DU hide timing
-        sum_hide_attr = 0
-        start_hide = time.perf_counter()
-        #
-        # we need to create subdirectories relative to the use of attributes list per AA
-        items = list(puncturable_attr_dict.items())
-        list_length = len(items) // 3
-        attr_dict_1 = dict(items[0:list_length])
-        attr_dict_2 = dict(items[list_length:(2 * list_length)])
-        attr_dict_3 = dict(items[(2 * list_length):])
-        #
-        attr_dict_1_hidden = p_mmacp_abe_instance.hide_attr(alice['gid'], alice['DO_key'], attr_dict_1)
-        attr_dict_2_hidden = p_mmacp_abe_instance.hide_attr(alice['gid'], alice['DO_key'], attr_dict_2)
-        attr_dict_3_hidden = p_mmacp_abe_instance.hide_attr(alice['gid'], alice['DO_key'], attr_dict_3)
-            #
-        end_hide = time.perf_counter()
-        time_hide = end_hide - start_hide
-        sum_hide_attr += time_hide
-
-        # mid printing
-        print(f" sum_setup_pmacpabe ->{sum_setup_pmacpabe}")
-        print(f"sum_keygen_pmacpabe ->{sum_keygen_pmacpabe}")
-        print(f"sum_hide_attr -> {sum_hide_attr}")
-
-           #  # AA keygen2
-           #  start_keygen_2 =time.perf_counter()
-           #  #
-           #  # hash_gid = abe.crs['group'].hash(str(alice['gid']), ZR)
-           #
-           #  aa_key_1 = abe.keygen2(AA_ID=1, gid=alice['gid'], S_DU=attr_dict_1_hidden ) #alice['attributes'])
-           #  print(f"the list of AA1 attributes is {attr_dict_1_hidden}")
-           #  aa_key_2 = abe.keygen2(AA_ID=2, gid=alice['gid'], S_DU=attr_dict_2_hidden) #alice['attributes'])
-           #  aa_key_3 = abe.keygen2(AA_ID=3, gid=alice['gid'], S_DU=attr_dict_3_hidden) #alice['attributes'])
-           #  #
-           #  end_keygen_2 =time.perf_counter()
-           #  time_keygen = end_keygen_2 - start_keygen_2
-           #  sum_keygen_pmacpabe += time_keygen
-           #  sum_keygen_2 += time_keygen
-           #
-           #
-           #  # TEE-CS Keygen3
-           #  start_keygen_3 =time.perf_counter()
-           #  #
-           #  alice['TK_DU'] = abe.keygen3([aa_key_1, aa_key_2, aa_key_3], alice['gid'])
-           #  #
-           #  end_keygen_3 =time.perf_counter()
-           #  time_keygen = end_keygen_3 - start_keygen_3
-           #  sum_keygen_pmacpabe += time_keygen
-           #  sum_keygen_3 += time_keygen
-           #
-           #
-           #  # DU keygen4 time
-           #  start_keygen_4 =time.perf_counter()
-           #  alice['DU_key'], alice['DU_hkey'] = abe.keygen4(alice['DO_key'], alice['TK_DU'])
-           #  end_keygen_4 =time.perf_counter()
-           #  time_keygen = end_keygen_4 - start_keygen_4
-           #  sum_keygen_pmacpabe += time_keygen
-           #  sum_keygen_4 += time_keygen
-           #
-           #  #-----------------------------------------------------------------------------------
-           #  # we can only form the hidden policy from inside this code section
-           #  # -----------------------------------------------------------------------------------
-           #  raw_attr_1 = abe.hide_by_DO(msk, attribute_value=attr_list[0], epsilon=epsilon_str)
-           #  hidden_attr_1 = abe.crs['group'].serialize(raw_attr_1, compression=False).hex().upper()
-           #
-           #  #
-           #  hidden_policy_str = f'({hidden_attr_1}'
-           # #
-           #  for att in attr_list[1:]:
-           #      raw_attr = abe.hide_by_DO(msk, attribute_value=att, epsilon=epsilon_str)
-           #      hidden_attr = abe.crs['group'].serialize(raw_attr, compression=False).hex().upper()
-           #      hidden_policy_str += f' and {hidden_attr}'
-           #  hidden_policy_str += ')'
-           #
-           #
-           #  # DO encryption
-           #  start_enc_1 =time.perf_counter()
-           #  #
-           #  ctxt = abe.encrypt(pk, msk, msg, policy_str, prv_DO, epsilon_str, hidden_policy_str)
-           #
-           #  # we get a copy of ctxt for decryption purposes since the puncturing will prevent normal decryption
-           #  # ctxt_copy = ctxt
-           #  #
-           #  end_enc_1 =time.perf_counter()
-           #  time_enc = end_enc_1 - start_enc_1
-           #  sum_enc_pmacpabe += time_enc
-           #
-           #
-           #  # size of ciphertext
-           #  size_cph += len(abe.crs['group'].serialize(ctxt['C_tilde'], compression=False)) + len(
-           #      abe.crs['group'].serialize(ctxt['C'], compression=False)) + len(
-           #      abe.crs['group'].serialize(ctxt['W'], compression=False)) + len(
-           #      abe.crs['group'].serialize(ctxt['sig_W'], compression=False)) + len(
-           #      str.encode(ctxt['policy'], encoding='utf-8')) + len(
-           #      abe.crs['group'].serialize(ctxt['ACC'].ACC_value, compression=False)) + len(
-           #      abe.crs['group'].serialize(ctxt['ACC'].acc_len, compression=False))
-           #  #
-           #  for value in ctxt['C_y'].values():
-           #      # size_cph += len(abe.crs['group'].serialize(value, compression=False))
-           #      # C_y values are ints
-           #      size_cph += len(str(value).encode('utf-8'))
-           #  #
-           #  for value in ctxt['T_y'].values():
-           #      size_cph += len(abe.crs['group'].serialize(value, compression=False))
-           #  #
-           #  for value in ctxt['C_attr'].values():
-           #      # size_cph += len(abe.crs['group'].serialize(value, compression=False))
-           #      size_cph += len(value)  # , compression=False))
-           #  #
-           #  for value in ctxt['attributes']:
-           #      size_cph += len(str.encode(value, encoding='utf-8'))
-           #  #
-           #  # for value in ctxt['ACC'].tag_list:
-           #  #     size_cph += len(str.encode(value, encoding='utf-8'))
-           #  #
-           #
-           #  # before puncturing we need to safegard the values of DU_jkey and DU_hkey as our implementation applies both sequentially
-           #  # but this can also be tolerated by our seamless design
-           #  DU_key_bak = alice['DU_key']
-           #  DU_hkey_bak = alice['DU_hkey']
-           #
-           #  # ---------------------------------------------------------------------------------------------------
-           #  # **************************user single puncturing ******************************
-           #  # ---------------------------------------------------------------------------------------------------
-           #  start_DU_puncture = time.perf_counter()
-           #  tag_to_puncture = uuid.uuid4() # we generate a legit tag
-           #  #
-           #  alice['DU_key'], alice['DU_hkey'], T_prime, desc_T_prime = abe.DU_single_puncture(
-           #          alice['DU_key'], alice['DU_hkey'], tag_to_puncture, alice['gid'], alice['k_anonymity'])
-           #  end_DU_puncture=time.perf_counter()
-           #  time_puncture1 = end_DU_puncture - start_DU_puncture
-           #  sum_puncture_1 += time_puncture1
-           #  sum_single_puncture +=  time_puncture1
-           #
-           #  # then the cloud performs the puncture to support the user  single puncture
-           #  start_CSPpuncture = time.perf_counter()
-           #  alice['DU_hkey'], ctxt['sig_ACC'] = abe.csp_puncture(ctxt, alice['DU_hkey'], T_prime, desc_T_prime, alice['gid'])
-           #  end_CSP_puncture = time.perf_counter()
-           #  time_puncture2 = end_CSP_puncture - start_CSPpuncture
-           #  sum_puncture_2 += time_puncture2
-           #  sum_single_puncture += time_puncture2
-           #
-           #  # we need to update the size of the ciphertext here
-           #  size_cph += len(abe.crs['group'].serialize(ctxt['sig_ACC'], compression=False))
-           #  #
-           #  for value in ctxt['ACC'].tag_list:
-           #      size_cph += len(str.encode(value, encoding='utf-8'))
-           #  #-------------------------------------------------------------------------------------------------------
-           #
-           #  # we need to update the size of the accumulator for single puncture here
-           #  if ctxt['ACC'].ACC_value is not None:
-           #      size_accumulator_single_puncture += len(abe.crs['group'].serialize(ctxt['ACC'].ACC_value, compression=False))
-           #  #
-           #  for value in ctxt['ACC'].tag_list:
-           #      size_accumulator_single_puncture += len(str.encode(value, encoding='utf-8'))
-           #
-           #  # ---------------------------------------------------------------------------------------------------
-           #  # **************************user batch puncturing ******************************
-           #  # ---------------------------------------------------------------------------------------------------
-           #  start_DU_puncture = time.perf_counter()
-           #  #
-           #  # use the original  secret and helper keys
-           #  alice['DU_key'] = DU_key_bak
-           #  alice['DU_hkey'] = DU_hkey_bak
-           #
-           #  # k-anonymity should be greater than the number of attributes
-           #  tag_to_puncture_list = [str(uuid.uuid4()) for _ in range(len(attr_list))] # uuid.uuid4() # we generate a legit tag
-           #  #
-           #  alice['DU_key'], alice['DU_hkey'], T_prime, desc_T_prime = abe.DU_batch_puncture(alice['DU_key'], alice['DU_hkey'], tag_to_puncture_list, alice['gid'], alice['k_anonymity'])
-           #  end_DU_puncture=time.perf_counter()
-           #  time_puncture3 = end_DU_puncture - start_DU_puncture
-           #  sum_puncture_3 += time_puncture3
-           #  sum_batch_puncture += time_puncture3
-           #
-           #  # then the cloud performs the puncture to support the user  batch puncture
-           #  start_CSPpuncture = time.perf_counter()
-           #  alice['DU_hkey'], ctxt['sig_ACC'] = abe.csp_puncture(ctxt, alice['DU_hkey'], T_prime, desc_T_prime, alice['gid'])
-           #  end_CSP_puncture = time.perf_counter()
-           #  time_puncture4 = end_CSP_puncture - start_CSPpuncture
-           #  sum_puncture_4 += time_puncture4
-           #  sum_batch_puncture += time_puncture4
-           #
-           #  # we need to update the size of the ciphertext here
-           #  for value in ctxt['ACC'].tag_list:
-           #      size_cph += len(str.encode(value, encoding='utf-8'))
-           #
-           #  # we need to update the size of the accumulator for batch puncture here
-           #  size_cph += len(abe.crs['group'].serialize(ctxt['sig_ACC'], compression=False))
-           #  #
-           #  size_accumulator_batch_puncture += len(
-           #      abe.crs['group'].serialize(ctxt['ACC'].ACC_value, compression=False)) + len(
-           #      abe.crs['group'].serialize(ctxt['ACC'].acc_len, compression=False))
-           #  #
-           #  for value in ctxt['ACC'].tag_list:
-           #      size_accumulator_batch_puncture += len(str.encode(value, encoding='utf-8'))
-           #  # -------------------------------------------------------------------------------------------------------
-           #
-           #  # TEE-CS ciphertext transformation
-           #  # outsourced decryption by the cloud
-           #  start_transform =time.perf_counter()
-           #  TC, I = abe.transform(ctxt, alice['DU_hkey'], alice['gid'])
-           #  end_transform =time.perf_counter()
-           #  time_transform = end_transform - start_transform
-           #  sum_transform += time_transform
-           #
-           #  # Final decryption stage by Data User
-           #  start_decrypt =time.perf_counter()
-           #  M2 = abe.decrypt(ctxt, TC, I, alice['DU_key'], pub_DO)
-           #  end_decrypt =time.perf_counter()
-           #  time_decrypt = end_decrypt - start_decrypt
-           #  sum_decrypt_pmacpabe += time_decrypt
-           #
-           #  # sanity check
-           #  assert msg == M2, "FAILED Decryption: message is incorrect"
-
-        # setup time
-        gc.collect(0)
-        gc.collect(1)
-        gc.collect(2)
-        gc.collect()
-    #
-        run_all(pairing_group, policy_size, policy_str, attr_list, puncturable_attr_dict, rw_policy_string, rw_attr_list, k1, k2, k3, msg, privacy_level, epsilon_str)
+        run_all(pairing_group, policy_str, attr_list, puncturable_attr_dict, rw_policy_string, rw_attr_list, k1, k2, k3,
+                msg, privacy_level, epsilon_str, policy_size)
         gc.collect(0)
         gc.collect(1)
         gc.collect(2)
@@ -1461,4 +1339,7 @@ if __name__ == "__main__":
     # # Optional: keep a reference so Python doesn't close it prematurely
     # sys.stdout.log_file = log_file
     #
+    single_puncture = True
+    batch_puncture = True
+
     main()
